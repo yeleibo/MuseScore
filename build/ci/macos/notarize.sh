@@ -19,7 +19,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 echo "Notarize MacOS .dmg"
-trap 'echo Notarize failed; exit 1' ERR
+#trap 'echo Notarize failed; exit 1' ERR
 
 ARTIFACTS_DIR="build.artifacts"
 APPLE_USERNAME=""
@@ -44,12 +44,14 @@ ARTIFACT_NAME="$(cat $ARTIFACTS_DIR/env/artifact_name.env)"
 echo "ARTIFACT_NAME: $ARTIFACT_NAME"
 
 echo "Uploading to apple to notarize..."
-RequestUUID=$(xcrun altool --notarize-app --primary-bundle-id "org.musescore.MuseScore" -u $APPLE_USERNAME -p $APPLE_PASSWORD --asc-provider MuseScore --file $ARTIFACTS_DIR/$ARTIFACT_NAME 2>&1 | grep RequestUUID | awk '{print $3'})
-
+echo "--- Test line 1 ---"
+RequestInfo=$(xcrun altool --notarize-app --primary-bundle-id "org.musescore.MuseScore" -u $APPLE_USERNAME -p $APPLE_PASSWORD --file $ARTIFACTS_DIR/$ARTIFACT_NAME 2>&1)
+echo "RequestInfo: $RequestInfo"
+RequestUUID=$(echo $RequestInfo | grep RequestUUID | awk '{print $3'})
 if  [ -z "$RequestUUID" ]
 then
 	echo "Notarization failed; running again to get error message"
-	failure=$(xcrun altool --notarize-app --primary-bundle-id "org.musescore.MuseScore" -u $APPLE_USERNAME -p $APPLE_PASSWORD --asc-provider MuseScore --file $ARTIFACTS_DIR/$ARTIFACT_NAME 2>&1)
+	failure=$(xcrun altool --notarize-app --primary-bundle-id "org.musescore.MuseScore" -u $APPLE_USERNAME -p $APPLE_PASSWORD --file $ARTIFACTS_DIR/$ARTIFACT_NAME 2>&1)
 	echo "MESSAGE: $failure"
 	exit 1
 else
