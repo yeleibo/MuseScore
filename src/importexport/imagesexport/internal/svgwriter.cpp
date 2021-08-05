@@ -19,7 +19,7 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
-
+#include <typeinfo>
 #include "svgwriter.h"
 
 #include "svggenerator.h"
@@ -32,11 +32,101 @@
 #include "libmscore/stafflines.h"
 
 #include "log.h"
+#include <export_struct.cpp>
 
 using namespace mu::iex::imagesexport;
 using namespace mu::project;
 using namespace mu::notation;
 using namespace mu::io;
+
+ExportNote getNoteSvgInfo(Ms::Page* page, Ms::Note* note) {
+    ExportNote exportNote = ExportNote();
+    for (int systemIndex = 0; systemIndex < page->systems().size(); systemIndex++) {
+        //for ( const Ms::System* system : page->systems()) {
+        Ms::System* system = page->systems()[systemIndex];
+
+        /*       ExportSystem  exportSystem= ExportSystem();
+               exportSheetMusicJson.systems.push_back(exportSystem);*/
+
+
+        const std::vector<Ms::MeasureBase*> measures = system->measures();
+
+
+        for (size_t i = 0; i < measures.size(); i++)
+        {
+
+            //这个地方还可能是VBox(用来显示标题相关内容)
+            if (measures[i]->type() == Ms::ElementType::MEASURE) {
+                Measure* measure = static_cast<Measure*>(measures[i]);
+
+               int measureIndex = measure->no();
+                /*      ExportMeasure  exportMeasure = ExportMeasure();
+                      exportMeasure.measureIndex = measure->no();
+                      exportSystem.measures.push_back(exportMeasure);*/
+
+
+                Ms::SegmentList segments = measure->segments();
+                Ms::Segment* segment = segments.first();
+                int segmentIndex = -1;
+                for (int j = 1; j < segments.size(); j++) {
+
+                    if (segment->segmentType() == Ms::SegmentType::ChordRest) {
+
+                        /*   ExportSegment  exportSegment =  ExportSegment();
+                           exportMeasure.exportSegments.push_back(exportSegment);*/
+
+                           //0-3是第一staff即右手,4-7是第二staff即左手,m的含义是第几声部
+                        for (int m = 0; m < 8; m++) {
+                            ChordRest* chordRest = segment->cr(m);
+                            if (chordRest != NULL) {
+
+                                if (chordRest->type() == Ms::ElementType::CHORD) {
+                                    segmentIndex++;
+                                    Ms::Chord* cr = static_cast<Ms::Chord*>(segment->cr(m));
+                                    if (cr != NULL) {
+
+                                        /* QVariant qv = QVariant::fromValue("abc");
+                                         cr->setProperty(Ms::Pid::SUBTYPE, qv);*/
+
+                                        std::vector<Note*> notes = cr->notes();
+                                        for (int t = 0; t < notes.size(); t++) {
+                                            if (notes[t] == note)
+                                            {
+
+                                                exportNote.systemIndex = systemIndex;
+                                                exportNote.measureIndex = measureIndex;
+                                                exportNote.segmentIndex = segmentIndex;
+                                                exportNote.staffIndex = m < 4 ? 0 : 1;
+
+                                                exportNote.noteValue = notes[t]->pitch();
+                                                return exportNote;
+                                            }
+
+
+                                        }
+                                    }
+                                }
+                                else if (chordRest->type() == Ms::ElementType::REST) {
+                                    printf("休止符");
+                                }
+                                else {
+                                    printf("其他符");
+                                }
+                            }
+                        }
+                    }
+
+
+
+                    segment = segment->next();
+                }
+            }
+
+        }
+
+    }
+    return exportNote;
+}
 
 std::vector<INotationWriter::UnitType> SvgWriter::supportedUnitTypes() const
 {
@@ -53,7 +143,7 @@ mu::Ret SvgWriter::write(INotationPtr notation, Device& destinationDevice, const
     IF_ASSERT_FAILED(score) {
         return make_ret(Ret::Code::UnknownError);
     }
-
+    ExportSheetMusicJson exportSheetMusicJson = ExportSheetMusicJson();
     score->setPrinting(true); // don’t print page break symbols etc.
 
     Ms::MScore::pdfPrinting = true;
@@ -156,7 +246,6 @@ mu::Ret SvgWriter::write(INotationPtr notation, Device& destinationDevice, const
                 for (size_t l = 0, c = lines.size(); l < c; l++) {
                     lines[l].setP2(mu::PointF(lastX, lines[l].p2().y()));
                 }
-
                 printer.setElement(firstSL);
                 Ms::paintElement(painter, firstSL);
             }
@@ -166,7 +255,7 @@ mu::Ret SvgWriter::write(INotationPtr notation, Device& destinationDevice, const
     // 2nd pass: the rest of the elements
     QList<Ms::Element*> elements = page->elements();
     std::stable_sort(elements.begin(), elements.end(), Ms::elementLessThan);
-
+    int lastNoteSvgId = -1;
     int lastNoteIndex = -1;
     for (int i = 0; i < PAGE_NUMBER; ++i) {
         for (const Ms::Element* element: pages[i]->elements()) {
@@ -178,7 +267,7 @@ mu::Ret SvgWriter::write(INotationPtr notation, Device& destinationDevice, const
 
     NotesColors notesColors = parseNotesColors(options.value(OptionKey::NOTES_COLORS, Val()).toQVariant());
 
-    for (const Ms::Element* element : elements) {
+    for (Ms::Element* element : elements) {
         // Always exclude invisible elements
         if (!element->visible()) {
             continue;
@@ -196,22 +285,51 @@ mu::Ret SvgWriter::write(INotationPtr notation, Device& destinationDevice, const
         // Set the Element pointer inside SvgGenerator/SvgPaintEngine
         printer.setElement(element);
 
-        // Paint it
-        if (element->type() == Ms::ElementType::NOTE && !notesColors.isEmpty()) {
-            QColor color = element->color().toQColor();
-            int currentNoteIndex = (++lastNoteIndex);
 
-            if (notesColors.contains(currentNoteIndex)) {
-                color = notesColors[currentNoteIndex];
+   
+
+        // Paint it
+        if (element->type() == Ms::ElementType::NOTE) {
+            Ms::Note* note = static_cast<Ms::Note*>(element);
+          
+            if (!notesColors.isEmpty()) {
+                 QColor color = element->color().toQColor();
+                int currentNoteIndex = (++lastNoteIndex);
+
+                if (notesColors.contains(currentNoteIndex)) {
+                    color = notesColors[currentNoteIndex];
+                }
+                element->setColor(color);
+            }
+            ExportNote noteInfo= getNoteSvgInfo(page, note);
+         
+            if (noteInfo.systemIndex != NULL) {   
+            
+                lastNoteSvgId++;
+                QString svgId = "svgId" + QString::number(noteInfo.systemIndex) + "-" + QString::number(noteInfo.measureIndex) + "-" + QString::number(noteInfo.segmentIndex) + "-" + QString::number(noteInfo.staffIndex) + "-" + QString::number(noteInfo.noteValue);
+         
+                element->setSvgId(svgId);
+
+                noteInfo.svgId = svgId.toStdString();
+                exportSheetMusicJson.notes.push_back(noteInfo);
+            }
+            else {
+                //throw "未找到音符相关信息";
+            }
+           
+
+        }
+        else if (element->type() == Ms::ElementType::BAR_LINE) {
+            Element* parent= element->parent()->parent();
+            if (parent->type() == Ms::ElementType::MEASURE) {
+                Ms::Measure* measure = static_cast<Ms::Measure*>(parent);
+                QString svgId = "svgId" + QString::number(measure->no());
+                element->setSvgId(svgId);
             }
 
-            Ms::Element* note = dynamic_cast<const Ms::Note*>(element)->clone();
-            note->setColor(color);
-            Ms::paintElement(painter, note);
-            delete note;
-        } else {
-            Ms::paintElement(painter, element);
         }
+        Ms::paintElement(painter, element);
+        
     }
 
     painter.endDraw(); // Writes MuseScore SVG file to disk, finally
@@ -222,8 +340,16 @@ mu::Ret SvgWriter::write(INotationPtr notation, Device& destinationDevice, const
     Ms::MScore::pdfPrinting = false;
     Ms::MScore::svgPrinting = false;
 
+
+
+    //tojson
+
+
+    std::string str = exportSheetMusicJson.toJson();
     return true;
 }
+
+
 
 SvgWriter::NotesColors SvgWriter::parseNotesColors(const QVariant& obj) const
 {
@@ -236,3 +362,4 @@ SvgWriter::NotesColors SvgWriter::parseNotesColors(const QVariant& obj) const
 
     return result;
 }
+

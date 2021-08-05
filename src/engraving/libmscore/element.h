@@ -189,6 +189,7 @@ public:
 
 class Element : public ScoreElement
 {
+    QString _svgId;
     Element* _parent { 0 };
     mutable mu::RectF _bbox;  ///< Bounding box relative to _pos + _offset
     qreal _mag;                     ///< standard magnification (derived value)
@@ -581,6 +582,9 @@ public:
     bool rebaseMinDistance(qreal& md, qreal& yd, qreal sp, qreal rebase, bool above, bool fix);
 
     qreal styleP(Sid idx) const;
+
+    QString getSvgId() const{ return _svgId; }
+    void setSvgId(QString v) { _svgId = v; }
 };
 
 using ElementPtr = std::shared_ptr<Element>;

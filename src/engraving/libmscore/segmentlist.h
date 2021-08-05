@@ -68,6 +68,7 @@ public:
         iterator(Segment* s) { p = s; }
         iterator operator++() { iterator i(p); p = p->next(); return i; }
         bool operator !=(const iterator& i) const { return p != i.p; }
+        bool operator ==(const iterator& i) const { return p == i.p; }
         Segment& operator*() { return *p; }
     };
     class const_iterator

@@ -32,6 +32,7 @@
 #include "libmscore/image.h"
 #include "libmscore/imageStore.h"
 #include "libmscore/mscore.h"
+#include <QtCore/qfile.h>
 
 ///////////////////////////////////////////////////////////////////////////////
 // FOR GRADIENT FUNCTIONALITY THAT IS NOT IMPLEMENTED (YET):
@@ -267,6 +268,8 @@ protected:
 #define SVG_CURVE    'C'
 
 #define SVG_CLASS    " class=\""
+
+#define SVG_ID    " id=\""
 
 #define SVG_ELEMENT_END  "/>"
 #define SVG_RPAREN_QUOTE ")\""
@@ -1154,6 +1157,12 @@ void SvgPaintEngine::updateState(const QPaintEngineState& s)
 
     // SVG class attribute, based on Ms::ElementType
     stateStream << SVG_CLASS << getClass(_element) << SVG_QUOTE;
+    
+
+    if (_element->getSvgId()!=NULL) {
+        QString svgId = _element->getSvgId();
+        stateStream << SVG_ID << svgId  << SVG_QUOTE;
+    }
 
     // Brush and Pen attributes
     stateStream << qbrushToSvg(s.brush());
