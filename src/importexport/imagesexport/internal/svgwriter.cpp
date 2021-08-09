@@ -38,12 +38,94 @@ using namespace mu::iex::imagesexport;
 using namespace mu::project;
 using namespace mu::notation;
 using namespace mu::io;
+ExportNote getNoteSvgInfoByParent(Ms::Note* note) {
+    ExportNote exportNote = ExportNote();
+    exportNote.noteValue = note->pitch();
+    Ms::Element* parent=note->parent();
+    Ms::Segment* segment;
+    while (parent->type() != Ms::ElementType::PAGE)
+    {
 
+        if (parent->type() == Ms::ElementType::SEGMENT) {
+            segment = static_cast<Ms::Segment*>(parent);
+            Measure* measure = static_cast<Measure*>(parent->parent());
+            Ms::SegmentList segments = measure->segments();
+            Ms::Segment* segmentTemp = segments.first();
+            int segmentIndex = -1;
+            for (int j = 0; j < segments.size(); j++) {
+                Ms::SegmentType type = segmentTemp->segmentType();
+                if (type == Ms::SegmentType::ChordRest) {
+                    segmentIndex++;
+                }
+                if (segment == segmentTemp) {
+                    exportNote.segmentIndex = segmentIndex;
+                    //0-3是第一staff即右手,4-7是第二staff即左手,m的含义是第几声部
+                    for (int m = 0; m < 8; m++) {
+                        ChordRest* chordRest = segment->cr(m);
+                        if (chordRest != NULL) {
+                            if (chordRest->type() == Ms::ElementType::CHORD) {
+
+                                Ms::Chord* cr = static_cast<Ms::Chord*>(segment->cr(m));
+                                if (cr != NULL) {
+
+                                    /* QVariant qv = QVariant::fromValue("abc");
+                                     cr->setProperty(Ms::Pid::SUBTYPE, qv);*/
+
+                                    std::vector<Note*> notes = cr->notes();
+                                    for (int t = 0; t < notes.size(); t++) {
+                                        if (notes[t] == note)
+                                        {
+                                            exportNote.trackIndex = m;
+                                            exportNote.staffIndex = m < 4 ? 0 : 1;
+                                            exportNote.noteIndex = t;
+                                         
+                                        }
+
+
+                                    }
+                                }
+                            }
+                            else if (chordRest->type() == Ms::ElementType::REST) {
+                                printf("休止符");
+                            }
+                            else {
+                                printf("其他符");
+                            }
+                        }
+                    }
+                    break;
+                }
+                segmentTemp = segmentTemp->next();
+            }
+
+
+     
+
+        }
+
+        if (parent->type() == Ms::ElementType::MEASURE) {
+            Measure* measure = static_cast<Measure*>(parent);
+            exportNote.measureIndex = measure->no();
+        }
+
+        if (parent->type() == Ms::ElementType::SYSTEM) {
+            Page* page = static_cast<Page*>(parent->parent());
+
+            Ms::System* system = static_cast<Ms::System*>(parent);
+            QList<Ms::System*> systems= page->systems();
+            exportNote.systemIndex=  systems.indexOf(system);
+        }
+
+
+        parent = parent->parent();
+    }
+    return exportNote;
+}
 ExportNote getNoteSvgInfo(Ms::Page* page, Ms::Note* note) {
     ExportNote exportNote = ExportNote();
-    for (int systemIndex = 0; systemIndex < page->systems().size(); systemIndex++) {
+    for (int systemNum = 0; systemNum < page->systems().size(); systemNum++) {
         //for ( const Ms::System* system : page->systems()) {
-        Ms::System* system = page->systems()[systemIndex];
+        Ms::System* system = page->systems()[systemNum];
 
         /*       ExportSystem  exportSystem= ExportSystem();
                exportSheetMusicJson.systems.push_back(exportSystem);*/
@@ -69,8 +151,8 @@ ExportNote getNoteSvgInfo(Ms::Page* page, Ms::Note* note) {
                 Ms::Segment* segment = segments.first();
                 int segmentIndex = -1;
                 for (int j = 1; j < segments.size(); j++) {
-
-                    if (segment->segmentType() == Ms::SegmentType::ChordRest) {
+                    Ms::SegmentType type= segment->segmentType();
+                    if (type == Ms::SegmentType::ChordRest) {
 
                         /*   ExportSegment  exportSegment =  ExportSegment();
                            exportMeasure.exportSegments.push_back(exportSegment);*/
@@ -93,7 +175,7 @@ ExportNote getNoteSvgInfo(Ms::Page* page, Ms::Note* note) {
                                             if (notes[t] == note)
                                             {
 
-                                                exportNote.systemIndex = systemIndex;
+                                                exportNote.systemIndex = systemNum-1;
                                                 exportNote.measureIndex = measureIndex;
                                                 exportNote.segmentIndex = segmentIndex;
                                                 exportNote.staffIndex = m < 4 ? 0 : 1;
@@ -301,12 +383,15 @@ mu::Ret SvgWriter::write(INotationPtr notation, Device& destinationDevice, const
                 }
                 element->setColor(color);
             }
-            ExportNote noteInfo= getNoteSvgInfo(page, note);
-         
+            ExportNote noteInfo= getNoteSvgInfoByParent(note);
+     
+            int octave= note->octave();
+            NoteHead::Group group= note->headGroup();
+            QString qString= Ms::NoteHead::group2userName(group);
             if (noteInfo.systemIndex != NULL) {   
             
                 lastNoteSvgId++;
-                QString svgId = "svgId" + QString::number(noteInfo.systemIndex) + "-" + QString::number(noteInfo.measureIndex) + "-" + QString::number(noteInfo.segmentIndex) + "-" + QString::number(noteInfo.staffIndex) + "-" + QString::number(noteInfo.noteValue);
+                QString svgId = "svgId" + QString::number(noteInfo.systemIndex) + "-" + QString::number(noteInfo.measureIndex) + "-" + QString::number(noteInfo.segmentIndex) + "-" + QString::number(noteInfo.trackIndex) + "-" + QString::number(noteInfo.staffIndex) + "-" + QString::number(noteInfo.noteValue);
          
                 element->setSvgId(svgId);
 
