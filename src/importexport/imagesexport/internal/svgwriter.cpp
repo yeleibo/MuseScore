@@ -33,6 +33,13 @@
 
 #include "log.h"
 #include <export_struct.cpp>
+#ifdef _WIN32
+#include <windows.h>
+#else
+#include <time.h>
+#endif  // _WIND32
+#include <QtCore/qthread.h>
+
 
 using namespace mu::iex::imagesexport;
 using namespace mu::project;
@@ -194,6 +201,11 @@ mu::Ret SvgWriter::write(INotationPtr notation, Device& destinationDevice, const
         return make_ret(Ret::Code::UnknownError);
     }
     ExportSheetMusicJson exportSheetMusicJson = ExportSheetMusicJson();
+    Ms::MasterScore* masterScore = static_cast<Ms::MasterScore*>(score);
+    const Ms::TempoMap*  tempo=masterScore->tempomap();
+    Ms::TimeSigMap*  sigmap = masterScore->sigmap();
+   // exportSheetMusicJson
+
     score->setPrinting(true); // don’t print page break symbols etc.
 
     Ms::MScore::pdfPrinting = true;
@@ -362,7 +374,7 @@ mu::Ret SvgWriter::write(INotationPtr notation, Device& destinationDevice, const
                 QString svgId = "note-" + QString::number(noteInfo.systemIndex) + "-" + QString::number(noteInfo.measureIndex) + "-" + QString::number(noteInfo.segmentIndex) + "-" + QString::number(noteInfo.trackIndex) + "-" + QString::number(noteInfo.staffIndex) + "-" + QString::number(noteInfo.noteValue);
          
                 element->setSvgId(svgId);
-
+                QThread::usleep(1);
                 noteInfo.svgId = svgId.toStdString();
                 exportSheetMusicJson.notes.push_back(noteInfo);
             
