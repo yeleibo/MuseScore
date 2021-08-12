@@ -38,10 +38,68 @@ using namespace mu::iex::imagesexport;
 using namespace mu::project;
 using namespace mu::notation;
 using namespace mu::io;
-ExportNote getNoteSvgInfoByParent(Ms::Note* note) {
+ExportNote getNoteSvgInfoByParent(Ms::Rest* myRest) {
     ExportNote exportNote = ExportNote();
-    exportNote.noteValue = note->pitch();
-    Ms::Element* parent=note->parent();
+    exportNote.noteValue = 0;
+    exportNote.durationType = myRest->actualDurationType();
+   QString name= exportNote.durationType.name();
+    Ms::Element* parent = myRest->parent();
+    Ms::Segment* segment;
+    while (parent->type() != Ms::ElementType::PAGE)
+    {
+
+        if (parent->type() == Ms::ElementType::SEGMENT) {
+            segment = static_cast<Ms::Segment*>(parent);
+            Measure* measure = static_cast<Measure*>(parent->parent());
+            Ms::SegmentList segments = measure->segments();
+            Ms::Segment* segmentTemp = segments.first();
+            int segmentIndex = -1;
+            for (int j = 0; j < segments.size(); j++) {
+                Ms::SegmentType type = segmentTemp->segmentType();
+                if (type == Ms::SegmentType::ChordRest) {
+                    segmentIndex++;
+                }
+                if (segment == segmentTemp) {
+                    exportNote.segmentIndex = segmentIndex;
+                    break;
+                }
+                segmentTemp = segmentTemp->next();
+            }
+
+
+
+
+        }
+
+        if (parent->type() == Ms::ElementType::MEASURE) {
+            Measure* measure = static_cast<Measure*>(parent);
+            exportNote.measureIndex = measure->no();
+        }
+
+        if (parent->type() == Ms::ElementType::SYSTEM) {
+            Page* page = static_cast<Page*>(parent->parent());
+
+            Ms::System* system = static_cast<Ms::System*>(parent);
+            QList<Ms::System*> systems = page->systems();
+            exportNote.systemIndex = systems.indexOf(system);
+        }
+
+
+        parent = parent->parent();
+    }
+    return exportNote;
+}
+
+
+/// <summary>
+/// 获取note的输出信息
+/// </summary>
+/// <param name="myNote"></param>
+/// <returns></returns>
+ExportNote getNoteSvgInfoByParent(Ms::Note* myNote) {
+    ExportNote exportNote = ExportNote();
+    exportNote.noteValue = myNote->pitch();
+    Ms::Element* parent=myNote->parent();
     Ms::Segment* segment;
     while (parent->type() != Ms::ElementType::PAGE)
     {
@@ -63,17 +121,21 @@ ExportNote getNoteSvgInfoByParent(Ms::Note* note) {
                     for (int m = 0; m < 8; m++) {
                         ChordRest* chordRest = segment->cr(m);
                         if (chordRest != NULL) {
-                            if (chordRest->type() == Ms::ElementType::CHORD) {
+                        
 
-                                Ms::Chord* cr = static_cast<Ms::Chord*>(segment->cr(m));
-                                if (cr != NULL) {
+                                Ms::ChordRest* cr = segment->cr(m);
+                                if (cr != NULL && cr->type()== Ms::ElementType::CHORD) {
 
                                     /* QVariant qv = QVariant::fromValue("abc");
                                      cr->setProperty(Ms::Pid::SUBTYPE, qv);*/
-
-                                    std::vector<Note*> notes = cr->notes();
+                                    Ms::Chord* chord = static_cast<Ms::Chord*>(cr);
+                                   exportNote.durationType= chord->actualDurationType();
+                     
+                                   QString name = exportNote.durationType.name();
+                                    std::vector<Note*> notes = chord->notes();
+                                 
                                     for (int t = 0; t < notes.size(); t++) {
-                                        if (notes[t] == note)
+                                        if (notes[t] == myNote)
                                         {
                                             exportNote.trackIndex = m;
                                             exportNote.staffIndex = m < 4 ? 0 : 1;
@@ -84,13 +146,6 @@ ExportNote getNoteSvgInfoByParent(Ms::Note* note) {
 
                                     }
                                 }
-                            }
-                            else if (chordRest->type() == Ms::ElementType::REST) {
-                                printf("休止符");
-                            }
-                            else {
-                                printf("其他符");
-                            }
                         }
                     }
                     break;
@@ -121,94 +176,7 @@ ExportNote getNoteSvgInfoByParent(Ms::Note* note) {
     }
     return exportNote;
 }
-ExportNote getNoteSvgInfo(Ms::Page* page, Ms::Note* note) {
-    ExportNote exportNote = ExportNote();
-    for (int systemNum = 0; systemNum < page->systems().size(); systemNum++) {
-        //for ( const Ms::System* system : page->systems()) {
-        Ms::System* system = page->systems()[systemNum];
 
-        /*       ExportSystem  exportSystem= ExportSystem();
-               exportSheetMusicJson.systems.push_back(exportSystem);*/
-
-
-        const std::vector<Ms::MeasureBase*> measures = system->measures();
-
-
-        for (size_t i = 0; i < measures.size(); i++)
-        {
-
-            //这个地方还可能是VBox(用来显示标题相关内容)
-            if (measures[i]->type() == Ms::ElementType::MEASURE) {
-                Measure* measure = static_cast<Measure*>(measures[i]);
-
-               int measureIndex = measure->no();
-                /*      ExportMeasure  exportMeasure = ExportMeasure();
-                      exportMeasure.measureIndex = measure->no();
-                      exportSystem.measures.push_back(exportMeasure);*/
-
-
-                Ms::SegmentList segments = measure->segments();
-                Ms::Segment* segment = segments.first();
-                int segmentIndex = -1;
-                for (int j = 1; j < segments.size(); j++) {
-                    Ms::SegmentType type= segment->segmentType();
-                    if (type == Ms::SegmentType::ChordRest) {
-
-                        /*   ExportSegment  exportSegment =  ExportSegment();
-                           exportMeasure.exportSegments.push_back(exportSegment);*/
-
-                           //0-3是第一staff即右手,4-7是第二staff即左手,m的含义是第几声部
-                        for (int m = 0; m < 8; m++) {
-                            ChordRest* chordRest = segment->cr(m);
-                            if (chordRest != NULL) {
-
-                                if (chordRest->type() == Ms::ElementType::CHORD) {
-                                    segmentIndex++;
-                                    Ms::Chord* cr = static_cast<Ms::Chord*>(segment->cr(m));
-                                    if (cr != NULL) {
-
-                                        /* QVariant qv = QVariant::fromValue("abc");
-                                         cr->setProperty(Ms::Pid::SUBTYPE, qv);*/
-
-                                        std::vector<Note*> notes = cr->notes();
-                                        for (int t = 0; t < notes.size(); t++) {
-                                            if (notes[t] == note)
-                                            {
-
-                                                exportNote.systemIndex = systemNum-1;
-                                                exportNote.measureIndex = measureIndex;
-                                                exportNote.segmentIndex = segmentIndex;
-                                                exportNote.staffIndex = m < 4 ? 0 : 1;
-
-                                                exportNote.noteValue = notes[t]->pitch();
-                                                return exportNote;
-                                            }
-
-
-                                        }
-                                    }
-                                }
-                                else if (chordRest->type() == Ms::ElementType::REST) {
-                                    printf("休止符");
-                                }
-                                else {
-                                    printf("其他符");
-                                }
-                            }
-                        }
-                    }
-
-
-
-                    segment = segment->next();
-                }
-            }
-
-        }
-
-    }
-    return exportNote;
-}
 
 std::vector<INotationWriter::UnitType> SvgWriter::supportedUnitTypes() const
 {
@@ -388,21 +356,34 @@ mu::Ret SvgWriter::write(INotationPtr notation, Device& destinationDevice, const
             int octave= note->octave();
             NoteHead::Group group= note->headGroup();
             QString qString= Ms::NoteHead::group2userName(group);
-            if (noteInfo.systemIndex != NULL) {   
+         
             
                 lastNoteSvgId++;
-                QString svgId = "svgId" + QString::number(noteInfo.systemIndex) + "-" + QString::number(noteInfo.measureIndex) + "-" + QString::number(noteInfo.segmentIndex) + "-" + QString::number(noteInfo.trackIndex) + "-" + QString::number(noteInfo.staffIndex) + "-" + QString::number(noteInfo.noteValue);
+                QString svgId = "note-" + QString::number(noteInfo.systemIndex) + "-" + QString::number(noteInfo.measureIndex) + "-" + QString::number(noteInfo.segmentIndex) + "-" + QString::number(noteInfo.trackIndex) + "-" + QString::number(noteInfo.staffIndex) + "-" + QString::number(noteInfo.noteValue);
          
                 element->setSvgId(svgId);
 
                 noteInfo.svgId = svgId.toStdString();
                 exportSheetMusicJson.notes.push_back(noteInfo);
+            
+            //添加符点音符信息
+            QVector<Ms::NoteDot*> noteDots = note->dots();
+            if (!noteDots.isEmpty()) {
+                for (int i = 0; i < noteDots.size(); i++) {
+                    Ms::NoteDot* noteDot = noteDots[i];
+                    QString noteDotSvgId = "noteDot-" + QString::number(noteInfo.systemIndex) + "-" + QString::number(noteInfo.measureIndex) + "-" + QString::number(noteInfo.segmentIndex) + "-" + QString::number(noteInfo.trackIndex) + "-" + QString::number(noteInfo.staffIndex)  + "-" + QString::number(i);
+                    noteDot->setSvgId(noteDotSvgId);
+                    noteInfo.dots.push_back(ExportDot({ noteDotSvgId.toStdString() }));
+                }
             }
-            else {
-                //throw "未找到音符相关信息";
-            }
-           
 
+        }
+        else if (element->type() == Ms::ElementType::REST) {
+            Ms::Rest* rest = static_cast<Ms::Rest*>(element);
+            ExportNote noteInfo = getNoteSvgInfoByParent(rest);
+            rest->globalTicks();
+            //休止符
+            printf("休止符");
         }
         else if (element->type() == Ms::ElementType::BAR_LINE) {
             Element* parent= element->parent()->parent();
@@ -413,6 +394,7 @@ mu::Ret SvgWriter::write(INotationPtr notation, Device& destinationDevice, const
             }
 
         }
+        
         Ms::paintElement(painter, element);
         
     }
