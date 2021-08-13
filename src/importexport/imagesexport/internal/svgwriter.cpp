@@ -30,6 +30,7 @@
 #include "libmscore/staff.h"
 #include "libmscore/measure.h"
 #include "libmscore/stafflines.h"
+#include "libmscore/tempo.h"
 
 #include "log.h"
 #include <export_struct.cpp>
@@ -97,6 +98,29 @@ ExportNote getNoteSvgInfoByParent(Ms::Rest* myRest) {
     return exportNote;
 }
 
+
+// 获取系统的当前时间，单位微秒(us)
+int64_t GetSysTimeMicros()
+{
+#ifdef _WIN32
+    // 从1601年1月1日0:0:0:000到1970年1月1日0:0:0:000的时间(单位100ns)
+#define EPOCHFILETIME   (116444736000000000UL)
+    FILETIME ft;
+    LARGE_INTEGER li;
+    int64_t tt = 0;
+    GetSystemTimeAsFileTime(&ft);
+    li.LowPart = ft.dwLowDateTime;
+    li.HighPart = ft.dwHighDateTime;
+    // 从1970年1月1日0:0:0:000到现在的微秒数(UTC时间)
+    tt = (li.QuadPart - EPOCHFILETIME) / 10;
+    return tt;
+#else
+    timeval tv;
+    gettimeofday(&tv, 0);
+    return (int64_t)tv.tv_sec * 1000000 + (int64_t)tv.tv_usec;
+#endif // _WIN32
+    return 0;
+}
 
 /// <summary>
 /// 获取note的输出信息
@@ -195,17 +219,23 @@ mu::Ret SvgWriter::write(INotationPtr notation, Device& destinationDevice, const
     IF_ASSERT_FAILED(notation) {
         return make_ret(Ret::Code::UnknownError);
     }
-
     Ms::Score* score = notation->elements()->msScore();
     IF_ASSERT_FAILED(score) {
         return make_ret(Ret::Code::UnknownError);
     }
     ExportSheetMusicJson exportSheetMusicJson = ExportSheetMusicJson();
     Ms::MasterScore* masterScore = static_cast<Ms::MasterScore*>(score);
-    const Ms::TempoMap*  tempo=masterScore->tempomap();
-    Ms::TimeSigMap*  sigmap = masterScore->sigmap();
-   // exportSheetMusicJson
 
+    //节拍相关
+    Ms::TempoMap*  tempo=masterScore->tempomap();
+    std::map<int, Ms::TEvent>::iterator tEvent = tempo->begin();
+    exportSheetMusicJson.tempo=(*tEvent).second.tempo;
+
+   // 节拍相关  
+    Ms::TimeSigMap*  sigmap = masterScore->sigmap();
+
+    std::map<int, Ms::SigEvent>::iterator sigEvent = sigmap->begin();
+    exportSheetMusicJson.timeSig=(*sigEvent).second.timesig();
     score->setPrinting(true); // don’t print page break symbols etc.
 
     Ms::MScore::pdfPrinting = true;
@@ -221,6 +251,7 @@ mu::Ret SvgWriter::write(INotationPtr notation, Device& destinationDevice, const
 
     Ms::Page* page = pages.at(PAGE_NUMBER);
 
+    
     SvgGenerator printer;
     QString title(score->title());
     printer.setTitle(pages.size() > 1 ? QString("%1 (%2)").arg(title).arg(PAGE_NUMBER + 1) : title);
@@ -254,6 +285,13 @@ mu::Ret SvgWriter::write(INotationPtr notation, Device& destinationDevice, const
     // 1st pass: StaffLines
     for (const Ms::System* system : page->systems()) {
         int stavesCount = system->staves()->size();
+
+        std::vector<Ms::MeasureBase*> measures = system->measures();
+      /*      for (int i = 0; i < measures.size(); i++) {
+                Ms::MeasureBase* measure = measures[i];
+                bool   measure->hasStaff();
+                Staff* staff=measure->staff();
+            }*/
 
         for (int staffIndex = 0; staffIndex < stavesCount; ++staffIndex) {
             if (score->staff(staffIndex)->invisible(Ms::Fraction(0, 1)) || !score->staff(staffIndex)->show()) {
@@ -313,7 +351,7 @@ mu::Ret SvgWriter::write(INotationPtr notation, Device& destinationDevice, const
             }
         }
     }
-
+  
     // 2nd pass: the rest of the elements
     QList<Ms::Element*> elements = page->elements();
     std::stable_sort(elements.begin(), elements.end(), Ms::elementLessThan);
@@ -347,9 +385,17 @@ mu::Ret SvgWriter::write(INotationPtr notation, Device& destinationDevice, const
         // Set the Element pointer inside SvgGenerator/SvgPaintEngine
         printer.setElement(element);
 
-
-   
-
+        std::map<QString, QString> attrabute = std::map<QString, QString>();
+        if (element->hasStaff()) {
+            const Ms::Measure* measure = element->findMeasure();
+            if (measure != NULL) {
+                int measureIndex = measure->no();
+                int staffIndex = element->staffIdx();
+                QString staffAttabute = QString::number(measureIndex) + "-" + QString::number(staffIndex);
+                attrabute["staff"] = staffAttabute;
+                
+            }
+        }
         // Paint it
         if (element->type() == Ms::ElementType::NOTE) {
             Ms::Note* note = static_cast<Ms::Note*>(element);
@@ -371,9 +417,9 @@ mu::Ret SvgWriter::write(INotationPtr notation, Device& destinationDevice, const
          
             
                 lastNoteSvgId++;
-                QString svgId = "note-" + QString::number(noteInfo.systemIndex) + "-" + QString::number(noteInfo.measureIndex) + "-" + QString::number(noteInfo.segmentIndex) + "-" + QString::number(noteInfo.trackIndex) + "-" + QString::number(noteInfo.staffIndex) + "-" + QString::number(noteInfo.noteValue);
-         
-                element->setSvgId(svgId);
+                QString svgId = "note-" + QString::number(noteInfo.systemIndex) + "-" + QString::number(noteInfo.measureIndex) + "-" + QString::number(noteInfo.segmentIndex) + "-" + QString::number(noteInfo.trackIndex) + "-" + QString::number(noteInfo.staffIndex) + "-" + QString::number(noteInfo.noteValue)+"-"+ QString::number(GetSysTimeMicros());
+                attrabute["id"] = svgId;
+              
                 QThread::usleep(1);
                 noteInfo.svgId = svgId.toStdString();
                 exportSheetMusicJson.notes.push_back(noteInfo);
@@ -384,7 +430,9 @@ mu::Ret SvgWriter::write(INotationPtr notation, Device& destinationDevice, const
                 for (int i = 0; i < noteDots.size(); i++) {
                     Ms::NoteDot* noteDot = noteDots[i];
                     QString noteDotSvgId = "noteDot-" + QString::number(noteInfo.systemIndex) + "-" + QString::number(noteInfo.measureIndex) + "-" + QString::number(noteInfo.segmentIndex) + "-" + QString::number(noteInfo.trackIndex) + "-" + QString::number(noteInfo.staffIndex)  + "-" + QString::number(i);
-                    noteDot->setSvgId(noteDotSvgId);
+                 
+                    attrabute["id"] = noteDotSvgId;
+              
                     noteInfo.dots.push_back(ExportDot({ noteDotSvgId.toStdString() }));
                 }
             }
@@ -402,11 +450,24 @@ mu::Ret SvgWriter::write(INotationPtr notation, Device& destinationDevice, const
             if (parent->type() == Ms::ElementType::MEASURE) {
                 Ms::Measure* measure = static_cast<Ms::Measure*>(parent);
                 QString svgId = "svgId" + QString::number(measure->no());
-                element->setSvgId(svgId);
+                attrabute["id"] = svgId;
             }
 
         }
+        else if (element->type() == Ms::ElementType::BEAM) {
+            Ms::Beam* beam = static_cast<Ms::Beam*>(element);
+            QVector<ChordRest*> cChordRest = beam->elements();
+            
+            const Ms::Measure* measure = cChordRest.first()->findMeasure();
+            if (measure != NULL) {
+                int measureIndex = measure->no();
+                int staffIndex = cChordRest.first()->staffIdx();
+                QString staffAttabute = QString::number(measureIndex) + "-" + QString::number(staffIndex);
+                attrabute["staff"] = staffAttabute;
+            }
+        }
         
+        element->setAttrabute(attrabute);
         Ms::paintElement(painter, element);
         
     }

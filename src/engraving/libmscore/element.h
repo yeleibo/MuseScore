@@ -189,7 +189,7 @@ public:
 
 class Element : public ScoreElement
 {
-    QString _svgId;
+    std::map<QString, QString> _attrabute;
     Element* _parent { 0 };
     mutable mu::RectF _bbox;  ///< Bounding box relative to _pos + _offset
     qreal _mag;                     ///< standard magnification (derived value)
@@ -583,8 +583,8 @@ public:
 
     qreal styleP(Sid idx) const;
 
-    QString getSvgId() const{ return _svgId; }
-    void setSvgId(QString v) { _svgId = v; }
+    std::map<QString, QString> getAttrabute() const{ return _attrabute; }
+    void setAttrabute(std::map<QString, QString> v) { _attrabute=v; }
 };
 
 using ElementPtr = std::shared_ptr<Element>;

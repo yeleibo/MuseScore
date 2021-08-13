@@ -33,6 +33,7 @@
 #include "libmscore/imageStore.h"
 #include "libmscore/mscore.h"
 #include <QtCore/qfile.h>
+#include <src/engraving/libmscore/measure.h>
 
 ///////////////////////////////////////////////////////////////////////////////
 // FOR GRADIENT FUNCTIONALITY THAT IS NOT IMPLEMENTED (YET):
@@ -270,6 +271,7 @@ protected:
 #define SVG_CLASS    " class=\""
 
 #define SVG_ID    " id=\""
+#define STAFF    " staff=\""
 
 #define SVG_ELEMENT_END  "/>"
 #define SVG_RPAREN_QUOTE ")\""
@@ -1157,12 +1159,36 @@ void SvgPaintEngine::updateState(const QPaintEngineState& s)
 
     // SVG class attribute, based on Ms::ElementType
     stateStream << SVG_CLASS << getClass(_element) << SVG_QUOTE;
-    
 
-    if (_element->getSvgId()!=NULL) {
-        QString svgId = _element->getSvgId();
-        stateStream << SVG_ID << svgId  << SVG_QUOTE;
+    std::map<QString, QString> attrabute= _element->getAttrabute();
+    for (std::map<QString, QString>::iterator item = attrabute.begin(); item != attrabute.end(); item++) {
+       
+        stateStream << " " << (*item).first << "= \"" << (*item).second << SVG_QUOTE;
     }
+
+    //if (_element->getSvgId()!=NULL) {
+    //    QString svgId = _element->getSvgId();
+    //    stateStream << SVG_ID << svgId  << SVG_QUOTE;
+    //}
+    //if (_element->hasStaff()) {
+    //   const Ms::Measure* measure=_element->findMeasure();
+    //   if (measure != NULL) {
+    //       int measureIndex=  measure->no();
+    //       int staffIndex = _element->staffIdx();
+    //       stateStream << STAFF << measureIndex << "-" << staffIndex << SVG_QUOTE;
+    //   }
+    // 
+    //}
+
+    //if (_element->type() == Ms::ElementType::BEAM) {
+    //    Ms::Beam* beam = static_cast<Ms::Beam*>(_element);
+    //    const Ms::Measure* measure = _element->parent()->findMeasure();
+    //    if (measure != NULL) {
+    //        int measureIndex = measure->no();
+    //        int staffIndex = _element->parent()->staffIdx();
+    //        stateStream << STAFF << measureIndex << "-" << staffIndex << SVG_QUOTE;
+    //    }
+    //}
 
     // Brush and Pen attributes
     stateStream << qbrushToSvg(s.brush());
