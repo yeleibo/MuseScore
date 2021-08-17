@@ -33,7 +33,6 @@
 #include "libmscore/tempo.h"
 
 #include "log.h"
-#include <export_struct.cpp>
 #ifdef _WIN32
 #include <windows.h>
 #else
@@ -46,9 +45,61 @@ using namespace mu::iex::imagesexport;
 using namespace mu::project;
 using namespace mu::notation;
 using namespace mu::io;
+
+struct ExportDot
+{
+    std::string noteDotSvgId;
+};
+struct ExportNote
+{
+    int noteValue;
+    Ms::TDuration durationType;
+    int segmentIndex;
+    int measureIndex;
+    int systemIndex;
+    int trackIndex;
+    int staffIndex;
+    int noteIndex;
+    std::string svgId;
+    std::vector<ExportDot> dots;
+    float startTime;
+    float endTime;
+    std::string toJson() {
+        
+        QString result = QObject::tr(
+            "{\"systemIndex\":%1,\"measureList1\":%2,\"staffEntries\":%3,\"measureList2\":%4,\"key\":%5,\"graphicalVoiceEntries\":%6,\"notes\":%7,\"startTime\":%8,\"endTime\":%9,\"svgId\":\"%10\"}"
+         ).arg(QString::number(systemIndex), QString::number(measureIndex), QString::number(segmentIndex), QString::number(staffIndex), QString::number(noteValue), QString::number(trackIndex), QString::number(noteIndex), QString::number(int(startTime*1000)), QString::number(int(endTime*1000)), QString::fromStdString(svgId));
+            return result.toStdString();
+    }
+};
+
+struct ExportSheetMusicJson
+{
+    std::vector<ExportNote> notes;
+    Ms::TimeSigFrac timeSig;
+    qreal tempo;
+    std::string toJson() {
+        std::string str = "{";
+       // str +="timeSig:"
+
+        str += "\"notes\":[";
+        for (std::vector<ExportNote>::iterator note = notes.begin(); note != notes.end(); note++) {
+            str += (*note).toJson();
+            if (note != notes.end()-1) {
+                str += ",";
+            }
+            
+            
+        }
+
+        str += "]}";
+        return str;
+    }
+};
 ExportNote getNoteSvgInfoByParent(Ms::Rest* myRest) {
     ExportNote exportNote = ExportNote();
     exportNote.noteValue = 0;
+    exportNote.staffIndex = myRest->staffIdx();
     exportNote.durationType = myRest->actualDurationType();
    QString name= exportNote.durationType.name();
     Ms::Element* parent = myRest->parent();
@@ -130,7 +181,11 @@ int64_t GetSysTimeMicros()
 ExportNote getNoteSvgInfoByParent(Ms::Note* myNote) {
     ExportNote exportNote = ExportNote();
     exportNote.noteValue = myNote->pitch();
+    exportNote.staffIndex = myNote->staffIdx();
+    exportNote.trackIndex = myNote->track();
     Ms::Element* parent=myNote->parent();
+
+
     Ms::Segment* segment;
     while (parent->type() != Ms::ElementType::PAGE)
     {
@@ -149,12 +204,11 @@ ExportNote getNoteSvgInfoByParent(Ms::Note* myNote) {
                 if (segment == segmentTemp) {
                     exportNote.segmentIndex = segmentIndex;
                     //0-3是第一staff即右手,4-7是第二staff即左手,m的含义是第几声部
-                    for (int m = 0; m < 8; m++) {
-                        ChordRest* chordRest = segment->cr(m);
-                        if (chordRest != NULL) {
+               
+                 
                         
 
-                                Ms::ChordRest* cr = segment->cr(m);
+                                Ms::ChordRest* cr = segment->cr(exportNote.trackIndex);
                                 if (cr != NULL && cr->type()== Ms::ElementType::CHORD) {
 
                                     /* QVariant qv = QVariant::fromValue("abc");
@@ -164,12 +218,11 @@ ExportNote getNoteSvgInfoByParent(Ms::Note* myNote) {
                      
                                    QString name = exportNote.durationType.name();
                                     std::vector<Note*> notes = chord->notes();
-                                 
+                                
                                     for (int t = 0; t < notes.size(); t++) {
                                         if (notes[t] == myNote)
-                                        {
-                                            exportNote.trackIndex = m;
-                                            exportNote.staffIndex = m < 4 ? 0 : 1;
+                                        {  
+                                
                                             exportNote.noteIndex = t;
                                          
                                         }
@@ -177,8 +230,8 @@ ExportNote getNoteSvgInfoByParent(Ms::Note* myNote) {
 
                                     }
                                 }
-                        }
-                    }
+                        
+                    
                     break;
                 }
                 segmentTemp = segmentTemp->next();
@@ -226,6 +279,8 @@ mu::Ret SvgWriter::write(INotationPtr notation, Device& destinationDevice, const
     ExportSheetMusicJson exportSheetMusicJson = ExportSheetMusicJson();
     Ms::MasterScore* masterScore = static_cast<Ms::MasterScore*>(score);
 
+    Ms::EventMap events;
+    score->renderMidi(&events, false, false, score->synthesizerState());
     //节拍相关
     Ms::TempoMap*  tempo=masterScore->tempomap();
     std::map<int, Ms::TEvent>::iterator tEvent = tempo->begin();
@@ -355,7 +410,7 @@ mu::Ret SvgWriter::write(INotationPtr notation, Device& destinationDevice, const
     // 2nd pass: the rest of the elements
     QList<Ms::Element*> elements = page->elements();
     std::stable_sort(elements.begin(), elements.end(), Ms::elementLessThan);
-    int lastNoteSvgId = -1;
+
     int lastNoteIndex = -1;
     for (int i = 0; i < PAGE_NUMBER; ++i) {
         for (const Ms::Element* element: pages[i]->elements()) {
@@ -367,6 +422,7 @@ mu::Ret SvgWriter::write(INotationPtr notation, Device& destinationDevice, const
 
     NotesColors notesColors = parseNotesColors(options.value(OptionKey::NOTES_COLORS, Val()).toQVariant());
 
+    QList<Ms::Note*> notes;
     for (Ms::Element* element : elements) {
         // Always exclude invisible elements
         if (!element->visible()) {
@@ -399,7 +455,8 @@ mu::Ret SvgWriter::write(INotationPtr notation, Device& destinationDevice, const
         // Paint it
         if (element->type() == Ms::ElementType::NOTE) {
             Ms::Note* note = static_cast<Ms::Note*>(element);
-          
+ 
+            notes.append(note);
             if (!notesColors.isEmpty()) {
                  QColor color = element->color().toQColor();
                 int currentNoteIndex = (++lastNoteIndex);
@@ -409,33 +466,50 @@ mu::Ret SvgWriter::write(INotationPtr notation, Device& destinationDevice, const
                 }
                 element->setColor(color);
             }
+
+
+
             ExportNote noteInfo= getNoteSvgInfoByParent(note);
-     
-            int octave= note->octave();
-            NoteHead::Group group= note->headGroup();
-            QString qString= Ms::NoteHead::group2userName(group);
-         
-            
-                lastNoteSvgId++;
-                QString svgId = "note-" + QString::number(noteInfo.systemIndex) + "-" + QString::number(noteInfo.measureIndex) + "-" + QString::number(noteInfo.segmentIndex) + "-" + QString::number(noteInfo.trackIndex) + "-" + QString::number(noteInfo.staffIndex) + "-" + QString::number(noteInfo.noteValue)+"-"+ QString::number(GetSysTimeMicros());
-                attrabute["id"] = svgId;
-              
-                QThread::usleep(1);
-                noteInfo.svgId = svgId.toStdString();
-                exportSheetMusicJson.notes.push_back(noteInfo);
-            
-            //添加符点音符信息
-            QVector<Ms::NoteDot*> noteDots = note->dots();
-            if (!noteDots.isEmpty()) {
-                for (int i = 0; i < noteDots.size(); i++) {
-                    Ms::NoteDot* noteDot = noteDots[i];
-                    QString noteDotSvgId = "noteDot-" + QString::number(noteInfo.systemIndex) + "-" + QString::number(noteInfo.measureIndex) + "-" + QString::number(noteInfo.segmentIndex) + "-" + QString::number(noteInfo.trackIndex) + "-" + QString::number(noteInfo.staffIndex)  + "-" + QString::number(i);
-                 
-                    attrabute["id"] = noteDotSvgId;
-              
-                    noteInfo.dots.push_back(ExportDot({ noteDotSvgId.toStdString() }));
+            bool isStartHaveValue = false;
+            for (auto i = events.begin(); i != events.end(); ++i) {
+                  const Ms::NPlayEvent& event = i->second;
+                if (event.note() == note) {
+                    float time = float(i->first) / Ms::MScore::division;
+             
+                    if (!isStartHaveValue) {
+                        noteInfo.startTime = time;
+                        isStartHaveValue = true;
+                    }else {
+                        if (noteInfo.startTime > time) {
+                            noteInfo.endTime = noteInfo.startTime;
+                            noteInfo.startTime = time;
+                        }
+                        else {
+                                noteInfo.endTime = time;
+                        }
+                    
+                    }
                 }
             }
+
+            QString svgId = "note-" + QString::number(noteInfo.systemIndex) + "-" + QString::number(noteInfo.measureIndex) + "-" + QString::number(noteInfo.segmentIndex) + "-" + QString::number(noteInfo.trackIndex) + "-" + QString::number(noteInfo.staffIndex) + "-" + QString::number(noteInfo.noteValue)+"-"+ QString::number(noteInfo.startTime) + "-" + QString::number(noteInfo.endTime);
+            attrabute["id"] = svgId;
+              
+            noteInfo.svgId = svgId.toStdString();
+            exportSheetMusicJson.notes.push_back(noteInfo);
+            
+            ////添加符点音符信息
+            //QVector<Ms::NoteDot*> noteDots = note->dots();
+            //if (!noteDots.isEmpty()) {
+            //    for (int i = 0; i < noteDots.size(); i++) {
+            //        Ms::NoteDot* noteDot = noteDots[i];
+            //        QString noteDotSvgId = "noteDot-" + QString::number(noteInfo.systemIndex) + "-" + QString::number(noteInfo.measureIndex) + "-" + QString::number(noteInfo.segmentIndex) + "-" + QString::number(noteInfo.trackIndex) + "-" + QString::number(noteInfo.staffIndex)  + "-" + QString::number(i);
+            //     
+            //        attrabute["id"] = noteDotSvgId;
+            //  
+            //        noteInfo.dots.push_back(ExportDot({ noteDotSvgId.toStdString() }));
+            //    }
+            //}
 
         }
         else if (element->type() == Ms::ElementType::REST) {
@@ -471,7 +545,7 @@ mu::Ret SvgWriter::write(INotationPtr notation, Device& destinationDevice, const
         Ms::paintElement(painter, element);
         
     }
-
+    std::stable_sort(notes.begin(), notes.end(), Ms::elementLessThan);
     painter.endDraw(); // Writes MuseScore SVG file to disk, finally
 
     // Clean up and return

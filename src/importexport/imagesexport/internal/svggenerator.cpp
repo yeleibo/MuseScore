@@ -1166,29 +1166,6 @@ void SvgPaintEngine::updateState(const QPaintEngineState& s)
         stateStream << " " << (*item).first << "= \"" << (*item).second << SVG_QUOTE;
     }
 
-    //if (_element->getSvgId()!=NULL) {
-    //    QString svgId = _element->getSvgId();
-    //    stateStream << SVG_ID << svgId  << SVG_QUOTE;
-    //}
-    //if (_element->hasStaff()) {
-    //   const Ms::Measure* measure=_element->findMeasure();
-    //   if (measure != NULL) {
-    //       int measureIndex=  measure->no();
-    //       int staffIndex = _element->staffIdx();
-    //       stateStream << STAFF << measureIndex << "-" << staffIndex << SVG_QUOTE;
-    //   }
-    // 
-    //}
-
-    //if (_element->type() == Ms::ElementType::BEAM) {
-    //    Ms::Beam* beam = static_cast<Ms::Beam*>(_element);
-    //    const Ms::Measure* measure = _element->parent()->findMeasure();
-    //    if (measure != NULL) {
-    //        int measureIndex = measure->no();
-    //        int staffIndex = _element->parent()->staffIdx();
-    //        stateStream << STAFF << measureIndex << "-" << staffIndex << SVG_QUOTE;
-    //    }
-    //}
 
     // Brush and Pen attributes
     stateStream << qbrushToSvg(s.brush());
