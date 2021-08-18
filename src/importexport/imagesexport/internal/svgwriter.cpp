@@ -69,18 +69,71 @@ struct ExportNote
         QString result = QObject::tr(
             "{\"systemIndex\":%1,\"measureList1\":%2,\"staffEntries\":%3,\"measureList2\":%4,\"key\":%5,\"graphicalVoiceEntries\":%6,\"notes\":%7,\"startTime\":%8,\"endTime\":%9,\"svgId\":\"%10\"}"
          ).arg(QString::number(systemIndex), QString::number(measureIndex), QString::number(segmentIndex), QString::number(staffIndex), QString::number(noteValue), QString::number(trackIndex), QString::number(noteIndex), QString::number(int(startTime*1000)), QString::number(int(endTime*1000)), QString::fromStdString(svgId));
-            return result.toStdString();
+        
+        return result.toStdString();
+    }
+};
+struct ExportSystem
+{
+    int systemIndex;
+    float startX;
+    float startY;
+    float encX;
+    float endY;
+
+    std::string toJson() {
+
+        QString result = QObject::tr(
+            "{\"startX\":%1,\"startY\":%2,\"encX\":%3,\"endY\":%4\",\"systemIndex\":%systemIndex\"}"
+        ).arg(QString::number(startX), QString::number(startY), QString::number(encX), QString::number(systemIndex));
+
+        return result.toStdString();
+    }
+};
+struct ExportMeasure
+{
+    float startX;
+    float startY;
+    float encX;
+    float endY;
+
+    std::string toJson() {
+
+        QString result = QObject::tr(
+            "{\"startX\":%1,\"startY\":%2,\"encX\":%3,\"endY\":%4\"}"
+        ).arg(QString::number(startX), QString::number(startY), QString::number(encX), QString::number(endY));
+    
+        return result.toStdString();
     }
 };
 
 struct ExportSheetMusicJson
 {
     std::vector<ExportNote> notes;
+    std::vector<ExportSystem> systems;
+    std::vector<ExportMeasure> measures;
     Ms::TimeSigFrac timeSig;
     qreal tempo;
     std::string toJson() {
         std::string str = "{";
-       // str +="timeSig:"
+     
+        str += "\"systems\":[";
+        for (std::vector<ExportSystem>::iterator system = systems.begin(); system != systems.end(); system++) {
+            str += (*system).toJson();
+            if (system != systems.end() - 1) {
+                str += ",";
+            }
+        }
+        str += "],";
+
+        str += "\"measures\":[";
+        for (std::vector<ExportMeasure>::iterator measure = measures.begin(); measure != measures.end(); measure++) {
+            str += (*measure).toJson();
+            if (measure != measures.end() - 1) {
+                str += ",";
+            }
+        }
+        str += "],";
 
         str += "\"notes\":[";
         for (std::vector<ExportNote>::iterator note = notes.begin(); note != notes.end(); note++) {
@@ -541,11 +594,31 @@ mu::Ret SvgWriter::write(INotationPtr notation, Device& destinationDevice, const
             }
         }
         
+        
         element->setAttrabute(attrabute);
         Ms::paintElement(painter, element);
         
     }
     std::stable_sort(notes.begin(), notes.end(), Ms::elementLessThan);
+    QList<Ms::System*> systems= page->systems();
+    for (int i = 0; i < systems.size(); i++) {
+        Ms::System* system = systems[i];
+        ExportSystem exportSystem = ExportSystem();
+        exportSystem.systemIndex = i;
+        exportSystem.startX = system->x();
+        exportSystem.startY  =system->y();
+        exportSystem.encX = system->x()+ system->width();
+        exportSystem.endY = system->y()+ system->height();
+        system->height();
+        system->width();
+        //exportSystem.startX = system->vbox().x;
+
+        std::vector<Ms::MeasureBase*> measures=system->measures();
+        for (int j = 0; j < measures.size(); j++) {
+                
+       
+        }
+    }
     painter.endDraw(); // Writes MuseScore SVG file to disk, finally
 
     // Clean up and return
