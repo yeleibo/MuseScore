@@ -160,6 +160,16 @@ public:
     void drawPixmap(const PointF& point, const Pixmap& pm);
     void drawTiledPixmap(const RectF& rect, const Pixmap& pm, const PointF& offset = PointF());
 
+    struct State {
+        RectF window;
+        RectF viewport;
+        bool isVxF = false;
+        Transform viewTransform;
+        bool isWxF = false;
+        Transform worldTransform;       // World transformation matrix, not window and viewport
+        Transform transform;            // Complete transformation matrix
+    };
+    const State& state() const;
 #ifndef NO_QT_SUPPORT
     void drawPixmap(const PointF& point, const QPixmap& pm);
     void drawTiledPixmap(const RectF& rect, const QPixmap& pm, const PointF& offset = PointF());
@@ -174,19 +184,10 @@ public:
 
 private:
 
-    struct State {
-        RectF window;
-        RectF viewport;
-        bool isVxF = false;
-        Transform viewTransform;
-        bool isWxF = false;
-        Transform worldTransform;       // World transformation matrix, not window and viewport
-        Transform transform;            // Complete transformation matrix
-    };
+
 
     void init();
     State& editableState();
-    const State& state() const;
     Transform makeViewTransform() const;
     void updateMatrix();
 

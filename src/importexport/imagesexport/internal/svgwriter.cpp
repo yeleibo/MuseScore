@@ -31,13 +31,9 @@
 #include "libmscore/measure.h"
 #include "libmscore/stafflines.h"
 #include "libmscore/tempo.h"
-
+#include "svggenerator.h"
 #include "log.h"
-#ifdef _WIN32
-#include <windows.h>
-#else
-#include <time.h>
-#endif  // _WIND32
+#include <qglobal.h>
 #include <QtCore/qthread.h>
 
 
@@ -76,32 +72,33 @@ struct ExportNote
 struct ExportSystem
 {
     int systemIndex;
-    float startX;
-    float startY;
-    float encX;
-    float endY;
+    double startX;
+    double startY;
+    double width;
+    double height;
 
     std::string toJson() {
 
         QString result = QObject::tr(
-            "{\"startX\":%1,\"startY\":%2,\"encX\":%3,\"endY\":%4\",\"systemIndex\":%systemIndex\"}"
-        ).arg(QString::number(startX), QString::number(startY), QString::number(encX), QString::number(systemIndex));
+            "{\"startX\":%1,\"startY\":%2,\"width\":%3,\"height\":%4,\"systemIndex\":%5}"
+        ).arg(QString::number(startX), QString::number(startY), QString::number(width), QString::number(height), QString::number(systemIndex));
 
         return result.toStdString();
     }
 };
 struct ExportMeasure
 {
-    float startX;
-    float startY;
-    float encX;
-    float endY;
+    int measureIndex;
+    double startX;
+    double startY;
+    double width;
+    double height;
 
     std::string toJson() {
 
         QString result = QObject::tr(
-            "{\"startX\":%1,\"startY\":%2,\"encX\":%3,\"endY\":%4\"}"
-        ).arg(QString::number(startX), QString::number(startY), QString::number(encX), QString::number(endY));
+            "{\"startX\":%1,\"startY\":%2,\"width\":%3,\"height\":%4,\"measureIndex\":%5}"
+        ).arg(QString::number(startX), QString::number(startY), QString::number(width), QString::number(height), QString::number(measureIndex));
     
         return result.toStdString();
     }
@@ -203,28 +200,7 @@ ExportNote getNoteSvgInfoByParent(Ms::Rest* myRest) {
 }
 
 
-// 获取系统的当前时间，单位微秒(us)
-int64_t GetSysTimeMicros()
-{
-#ifdef _WIN32
-    // 从1601年1月1日0:0:0:000到1970年1月1日0:0:0:000的时间(单位100ns)
-#define EPOCHFILETIME   (116444736000000000UL)
-    FILETIME ft;
-    LARGE_INTEGER li;
-    int64_t tt = 0;
-    GetSystemTimeAsFileTime(&ft);
-    li.LowPart = ft.dwLowDateTime;
-    li.HighPart = ft.dwHighDateTime;
-    // 从1970年1月1日0:0:0:000到现在的微秒数(UTC时间)
-    tt = (li.QuadPart - EPOCHFILETIME) / 10;
-    return tt;
-#else
-    timeval tv;
-    gettimeofday(&tv, 0);
-    return (int64_t)tv.tv_sec * 1000000 + (int64_t)tv.tv_usec;
-#endif // _WIN32
-    return 0;
-}
+
 
 /// <summary>
 /// 获取note的输出信息
@@ -322,6 +298,7 @@ std::vector<INotationWriter::UnitType> SvgWriter::supportedUnitTypes() const
 
 mu::Ret SvgWriter::write(INotationPtr notation, Device& destinationDevice, const Options& options)
 {
+
     IF_ASSERT_FAILED(notation) {
         return make_ret(Ret::Code::UnknownError);
     }
@@ -370,6 +347,7 @@ mu::Ret SvgWriter::write(INotationPtr notation, Device& destinationDevice, const
     RectF pageRect = page->abbox();
     if (TRIM_MARGINS_SIZE >= 0) {
         QMarginsF margins(TRIM_MARGINS_SIZE, TRIM_MARGINS_SIZE, TRIM_MARGINS_SIZE, TRIM_MARGINS_SIZE);
+        QRectF t= page->tbbox().toQRectF();
         pageRect = RectF::fromQRectF(page->tbbox().toQRectF() + margins);
     }
 
@@ -427,13 +405,13 @@ mu::Ret SvgWriter::write(INotationPtr notation, Device& destinationDevice, const
             // In these cases the SVG staff lines for the system/staff
             // are drawn by measure.
             //
-            bool byMeasure = false;
-            for (Ms::MeasureBase* measure = firstMeasure; measure; measure = system->nextMeasure(measure)) {
+            bool byMeasure = true;
+       /*     for (Ms::MeasureBase* measure = firstMeasure; measure; measure = system->nextMeasure(measure)) {
                 if (!measure->isMeasure() || !Ms::toMeasure(measure)->visible(staffIndex)) {
                     byMeasure = true;
                     break;
                 }
-            }
+            }*/
 
             if (byMeasure) {     // Draw visible staff lines by measure
                 for (Ms::MeasureBase* measure = firstMeasure; measure; measure = system->nextMeasure(measure)) {
@@ -456,6 +434,7 @@ mu::Ret SvgWriter::write(INotationPtr notation, Device& destinationDevice, const
                 }
                 printer.setElement(firstSL);
                 Ms::paintElement(painter, firstSL);
+            
             }
         }
     }
@@ -597,28 +576,51 @@ mu::Ret SvgWriter::write(INotationPtr notation, Device& destinationDevice, const
         
         element->setAttrabute(attrabute);
         Ms::paintElement(painter, element);
-        
+      
     }
     std::stable_sort(notes.begin(), notes.end(), Ms::elementLessThan);
     QList<Ms::System*> systems= page->systems();
     for (int i = 0; i < systems.size(); i++) {
         Ms::System* system = systems[i];
+        if (system->staves()->size() == 0) {
+            continue ;
+        }
         ExportSystem exportSystem = ExportSystem();
-        exportSystem.systemIndex = i;
-        exportSystem.startX = system->x();
-        exportSystem.startY  =system->y();
-        exportSystem.encX = system->x()+ system->width();
-        exportSystem.endY = system->y()+ system->height();
-        system->height();
-        system->width();
-        //exportSystem.startX = system->vbox().x;
+       
+        exportSystem.systemIndex = i-1;
+        //获取system位置信息
+        printer.setElement(system);
+        PointF elementPosition(system->pagePos());
+        painter.translate(elementPosition);
+        mu::draw::Painter::State  state = painter.state();
+        exportSystem.startX = state.transform.m31();
+        exportSystem.startY = state.transform.m32();
+        exportSystem.width = system->width();
+        exportSystem.height = system->height();
+        exportSheetMusicJson.systems.push_back(exportSystem);
+        painter.translate(-elementPosition);
+
 
         std::vector<Ms::MeasureBase*> measures=system->measures();
         for (int j = 0; j < measures.size(); j++) {
-                
+            //获取measure位置信息
+            Ms::MeasureBase* measure = measures[j];
+            ExportMeasure exportMeasure = ExportMeasure();
+            exportMeasure.measureIndex = measure->no();
+            printer.setElement(measure);
+            PointF elementPosition(measure->pagePos());
+            painter.translate(elementPosition);
+            mu::draw::Painter::State  state = painter.state();
+            exportMeasure.startX = state.transform.m31();
+            exportMeasure.startY = state.transform.m32();
+            exportMeasure.width = measure->width();
+            exportMeasure.height = measure->height();
+            exportSheetMusicJson.measures.push_back(exportMeasure);
+            painter.translate(-elementPosition);
        
         }
-    }
+    }  
+ 
     painter.endDraw(); // Writes MuseScore SVG file to disk, finally
 
     // Clean up and return
@@ -629,13 +631,13 @@ mu::Ret SvgWriter::write(INotationPtr notation, Device& destinationDevice, const
 
 
 
-    //tojson
 
 
+   //tojson  
     std::string str = exportSheetMusicJson.toJson();
+
     return true;
 }
-
 
 
 SvgWriter::NotesColors SvgWriter::parseNotesColors(const QVariant& obj) const
