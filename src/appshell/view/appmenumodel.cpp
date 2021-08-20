@@ -123,6 +123,7 @@ MenuItem AppMenuModel::fileItem() const
 
     MenuItemList fileItems {
         makeMenuItem("file-new"),
+        makeMenuItem("open-folder"),
         makeMenuItem("file-open"),
         makeMenu(qtrc("appshell", "Open &recent"), recentScoresList, openRecentEnabled, "menu-file-open"),
         makeSeparator(),

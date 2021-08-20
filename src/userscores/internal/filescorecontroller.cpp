@@ -23,13 +23,19 @@
 
 #include <QObject>
 #include <QBuffer>
-
+#include <iostream>
+#include <cstring>        // for strcpy(), strcat()
+#include <io.h>
+#include <QDir>
 #include "translation.h"
 #include "notation/notationerrors.h"
+#include "exporttype.h"
 
 #include "userscoresconfiguration.h"
+#include "project/inotationwriter.h"
 
 #include "log.h"
+#include <QtWidgets/qfiledialog.h>
 
 using namespace mu;
 using namespace mu::userscores;
@@ -41,6 +47,7 @@ using namespace mu::actions;
 void FileScoreController::init()
 {
     dispatcher()->reg(this, "file-open", this, &FileScoreController::openProject);
+    dispatcher()->reg(this, "open-folder", this, &FileScoreController::openFolder);
     dispatcher()->reg(this, "file-new", this, &FileScoreController::newProject);
     dispatcher()->reg(this, "file-close", [this]() { closeOpenedProject(); });
 
@@ -117,6 +124,108 @@ void FileScoreController::openProject(const actions::ActionData& args)
 
     doOpenProject(scorePath);
 }
+/********************************************************
+输入：文件路径；保存全部文件名的容器
+/********************************************************/
+void findFile(const QString& path, std::vector<QString>& fileNames)
+{
+    QDir dir(path);
+    if (!dir.exists())
+    {
+        return;
+    }
+
+    //获取filePath下所有文件夹和文件
+    dir.setFilter(QDir::Dirs | QDir::Files | QDir::NoDotAndDotDot);//文件夹|文件|不包含./和../
+
+    //排序文件夹优先
+    dir.setSorting(QDir::DirsFirst);
+
+    //获取文件夹下所有文件(文件夹+文件)
+    QFileInfoList list = dir.entryInfoList();
+
+    /**********直接获取带文件后缀的文件;如果使用,则只搜索当前文件夹下的文件*************
+    QStringList filer;
+    filer << "*.jpg" <<"*.bmp";//设定需要的文件类型(*为所有类型)
+    QFileInfoList list = dir.entryInfoList(filer);
+    //QList<QFileInfo> *list= new QList<QFileInfo>(dir.entryInfoList(filter));
+    /*******************************************************************************/
+
+    /**********************只获取文件,只搜索当前文件夹下的文件************************
+    QStringList list= dir.entryList(filer, QDir::Files | QDir::NoDotAndDotDot);
+    /*******************************************************************************/
+
+    if (list.size() == 0)
+    {
+        return;
+    }
+
+    //遍历
+    for (int i = 0; i < list.size(); i++)
+    {
+        QFileInfo fileInfo = list.at(i);
+
+        if (fileInfo.isDir())//判断是否为文件夹
+        {
+            findFile(fileInfo.filePath(), fileNames);//递归开始
+        }
+        else
+        {
+            if (fileInfo.suffix() == "mscz" || (fileInfo.suffix() == "musicxml" && fileInfo.fileName().contains("unrolled")))//设定后缀
+            {
+                fileNames.emplace_back(path+"/" + list.at(i).fileName());//保存全部文件名
+                //fileNames.emplace_back(list.at(i).filePath());//保存全部文件路径+文件名
+            }
+        }
+    }
+}
+void FileScoreController::openFolder(const actions::ActionData& args)
+{
+    io::path scorePath = args.count() > 0 ? args.arg<io::path>(0) : "";
+
+    if (scorePath.empty()) {
+        QString folderPath = QFileDialog::getExistingDirectory(nullptr, "选择一个文件夹", "/");
+
+      std::vector<QString> fileNames;
+      findFile(folderPath, fileNames);
+
+      for (int i = 0; i < fileNames.size(); i++) {
+          QString filePath = fileNames[i];
+     
+
+          int lastDot = filePath.lastIndexOf(".");
+          QString svgFilePath = filePath.mid(0, lastDot) + ".svg";
+          QFile svgFile(svgFilePath);
+          if (svgFile.exists())
+          {
+              svgFile.remove();
+          }
+          svgFile.close();
+          //打开乐谱
+          doOpenProject(filePath);
+          //单竖行
+          auto notation = currentNotation();
+          if (!notation) {
+              return;
+          }
+
+          notation->setViewMode(ViewMode::SYSTEM);
+          ExportType exportType = ExportType::makeWithSuffixes({ "svg" },
+              qtrc("userscores", "SVG Images"),
+              qtrc("userscores", "SVG Images"),
+              "SvgSettingsPage.qml");
+          INotationPtrList notations;
+          notations.push_back(notation);
+
+          exportScoreScenario()->exportScoresWithPath(notations, exportType, project::INotationWriter::UnitType::PER_PAGE, svgFilePath);
+
+      }
+    }
+    printf("导出完成");
+    //doOpenProject(scorePath);
+}
+
+
 
 void FileScoreController::newProject()
 {

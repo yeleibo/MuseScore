@@ -34,6 +34,7 @@
 #include "iplatformrecentfilescontroller.h"
 #include "multiinstances/imultiinstancesprovider.h"
 #include "cloud/iuploadingservice.h"
+#include "iexportscorescenario.h"
 
 namespace mu::userscores {
 class FileScoreController : public IFileScoreController, public actions::Actionable, public async::Asyncable
@@ -46,7 +47,7 @@ class FileScoreController : public IFileScoreController, public actions::Actiona
     INJECT(userscores, IPlatformRecentFilesController, platformRecentFilesController)
     INJECT(userscores, mi::IMultiInstancesProvider, multiInstancesProvider)
     INJECT(userscores, cloud::IUploadingService, uploadingService)
-
+    INJECT(userscores, IExportScoreScenario, exportScoreScenario)
 public:
     void init();
 
@@ -64,6 +65,7 @@ private:
     notation::INotationSelectionPtr currentNotationSelection() const;
 
     void openProject(const actions::ActionData& args);
+    void openFolder(const actions::ActionData& args);
     void importScore();
     void newProject();
 

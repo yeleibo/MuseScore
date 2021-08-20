@@ -37,6 +37,8 @@ public:
 
     virtual bool exportScores(const notation::INotationPtrList& notations, const ExportType& exportType,
                               project::INotationWriter::UnitType unitType) const = 0;
+    virtual bool exportScoresWithPath(const notation::INotationPtrList& notations, const ExportType& exportType,
+        project::INotationWriter::UnitType unitType, QString filePath) const = 0;
 };
 }
 

@@ -47,6 +47,8 @@ public:
 
     bool exportScores(const notation::INotationPtrList& notations, const ExportType& exportType,
                       project::INotationWriter::UnitType unitType) const override;
+    bool exportScoresWithPath(const notation::INotationPtrList& notations, const ExportType& exportType,
+        project::INotationWriter::UnitType unitType,QString filePath) const override;
 
 private:
     enum class FileConflictPolicy {

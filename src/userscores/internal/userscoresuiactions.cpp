@@ -30,6 +30,11 @@ const UiActionList UserScoresUiActions::m_actions = {
              QT_TRANSLATE_NOOP("action", "Open..."),
              QT_TRANSLATE_NOOP("action", "Load score from file")
              ),
+    UiAction("open-folder",
+             mu::context::UiCtxAny,
+             QT_TRANSLATE_NOOP("action", "Open Folder"),
+             QT_TRANSLATE_NOOP("action", "Load score from folder")
+             ),
     UiAction("file-new",
              mu::context::UiCtxAny,
              QT_TRANSLATE_NOOP("action", "New..."),

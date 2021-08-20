@@ -42,9 +42,94 @@ std::vector<INotationWriter::UnitType> ExportScoreScenario::supportedUnitTypes(c
 
     return writer->supportedUnitTypes();
 }
+bool ExportScoreScenario::exportScoresWithPath(const INotationPtrList& notations, const ExportType& exportType,
+    INotationWriter::UnitType unitType,QString filePath) const
+{
+    IF_ASSERT_FAILED(!exportType.suffixes.isEmpty()) {
+        return false;
+    }
+
+    io::path chosenPath = filePath;
+
+
+    auto writer = writers()->writer(io::suffix(chosenPath));
+    if (!writer) {
+        return false;
+    }
+
+    IF_ASSERT_FAILED(writer->supportsUnitType(unitType)) {
+        return false;
+    }
+
+    bool isCreatingOnlyOneFile = this->isCreatingOnlyOneFile(notations, unitType);
+
+    // If isCreatingOnlyOneFile, the save dialog has already asked whether to replace
+    // any existing files. If the user cancels, the filepath will be empty, so we would
+    // not reach this point. But if we do, existing files should be overridden.
+    m_fileConflictPolicy = isCreatingOnlyOneFile ? FileConflictPolicy::ReplaceAll : FileConflictPolicy::Undefined;
+
+    switch (unitType) {
+    case INotationWriter::UnitType::PER_PAGE: {
+        for (INotationPtr notation : notations) {
+            for (int page = 0; page < notation->elements()->msScore()->pages().size(); page++) {
+                INotationWriter::Options options{
+                    { INotationWriter::OptionKey::UNIT_TYPE, Val(static_cast<int>(unitType)) },
+                    { INotationWriter::OptionKey::PAGE_NUMBER, Val(page) },
+                    { INotationWriter::OptionKey::TRANSPARENT_BACKGROUND,
+                      Val(imagesExportConfiguration()->exportPngWithTransparentBackground()) }
+                };
+
+                io::path definitivePath = isCreatingOnlyOneFile
+                    ? chosenPath
+                    : completeExportPath(chosenPath, notation, isMainNotation(notation), page);
+
+                auto exportFunction = [writer, notation, options](io::Device& destinationDevice) {
+                    return writer->write(notation, destinationDevice, options);
+                };
+
+                doExportLoop(definitivePath, exportFunction);
+            }
+        }
+    } break;
+    case INotationWriter::UnitType::PER_PART: {
+        for (INotationPtr notation : notations) {
+            INotationWriter::Options options{
+                { INotationWriter::OptionKey::UNIT_TYPE, Val(static_cast<int>(unitType)) },
+                { INotationWriter::OptionKey::TRANSPARENT_BACKGROUND,
+                  Val(imagesExportConfiguration()->exportPngWithTransparentBackground()) }
+            };
+
+            io::path definitivePath = isCreatingOnlyOneFile
+                ? chosenPath
+                : completeExportPath(chosenPath, notation, isMainNotation(notation));
+
+            auto exportFunction = [writer, notation, options](io::Device& destinationDevice) {
+                return writer->write(notation, destinationDevice, options);
+            };
+
+            doExportLoop(definitivePath, exportFunction);
+        }
+    } break;
+    case INotationWriter::UnitType::MULTI_PART: {
+        INotationWriter::Options options{
+            { INotationWriter::OptionKey::UNIT_TYPE, Val(static_cast<int>(unitType)) },
+            { INotationWriter::OptionKey::TRANSPARENT_BACKGROUND, Val(imagesExportConfiguration()->exportPngWithTransparentBackground()) }
+        };
+
+        auto exportFunction = [writer, notations, options](io::Device& destinationDevice) {
+            return writer->writeList(notations, destinationDevice, options);
+        };
+
+        doExportLoop(chosenPath, exportFunction);
+    } break;
+    }
+
+    return true;
+}
+
 
 bool ExportScoreScenario::exportScores(const INotationPtrList& notations, const ExportType& exportType,
-                                       INotationWriter::UnitType unitType) const
+    INotationWriter::UnitType unitType) const
 {
     IF_ASSERT_FAILED(!exportType.suffixes.isEmpty()) {
         return false;
@@ -75,7 +160,7 @@ bool ExportScoreScenario::exportScores(const INotationPtrList& notations, const 
     case INotationWriter::UnitType::PER_PAGE: {
         for (INotationPtr notation : notations) {
             for (int page = 0; page < notation->elements()->msScore()->pages().size(); page++) {
-                INotationWriter::Options options {
+                INotationWriter::Options options{
                     { INotationWriter::OptionKey::UNIT_TYPE, Val(static_cast<int>(unitType)) },
                     { INotationWriter::OptionKey::PAGE_NUMBER, Val(page) },
                     { INotationWriter::OptionKey::TRANSPARENT_BACKGROUND,
@@ -83,12 +168,12 @@ bool ExportScoreScenario::exportScores(const INotationPtrList& notations, const 
                 };
 
                 io::path definitivePath = isCreatingOnlyOneFile
-                                          ? chosenPath
-                                          : completeExportPath(chosenPath, notation, isMainNotation(notation), page);
+                    ? chosenPath
+                    : completeExportPath(chosenPath, notation, isMainNotation(notation), page);
 
                 auto exportFunction = [writer, notation, options](io::Device& destinationDevice) {
-                        return writer->write(notation, destinationDevice, options);
-                    };
+                    return writer->write(notation, destinationDevice, options);
+                };
 
                 doExportLoop(definitivePath, exportFunction);
             }
@@ -96,32 +181,32 @@ bool ExportScoreScenario::exportScores(const INotationPtrList& notations, const 
     } break;
     case INotationWriter::UnitType::PER_PART: {
         for (INotationPtr notation : notations) {
-            INotationWriter::Options options {
+            INotationWriter::Options options{
                 { INotationWriter::OptionKey::UNIT_TYPE, Val(static_cast<int>(unitType)) },
                 { INotationWriter::OptionKey::TRANSPARENT_BACKGROUND,
                   Val(imagesExportConfiguration()->exportPngWithTransparentBackground()) }
             };
 
             io::path definitivePath = isCreatingOnlyOneFile
-                                      ? chosenPath
-                                      : completeExportPath(chosenPath, notation, isMainNotation(notation));
+                ? chosenPath
+                : completeExportPath(chosenPath, notation, isMainNotation(notation));
 
             auto exportFunction = [writer, notation, options](io::Device& destinationDevice) {
-                    return writer->write(notation, destinationDevice, options);
-                };
+                return writer->write(notation, destinationDevice, options);
+            };
 
             doExportLoop(definitivePath, exportFunction);
         }
     } break;
     case INotationWriter::UnitType::MULTI_PART: {
-        INotationWriter::Options options {
+        INotationWriter::Options options{
             { INotationWriter::OptionKey::UNIT_TYPE, Val(static_cast<int>(unitType)) },
             { INotationWriter::OptionKey::TRANSPARENT_BACKGROUND, Val(imagesExportConfiguration()->exportPngWithTransparentBackground()) }
         };
 
         auto exportFunction = [writer, notations, options](io::Device& destinationDevice) {
-                return writer->writeList(notations, destinationDevice, options);
-            };
+            return writer->writeList(notations, destinationDevice, options);
+        };
 
         doExportLoop(chosenPath, exportFunction);
     } break;
@@ -129,7 +214,6 @@ bool ExportScoreScenario::exportScores(const INotationPtrList& notations, const 
 
     return true;
 }
-
 bool ExportScoreScenario::isCreatingOnlyOneFile(const INotationPtrList& notations, INotationWriter::UnitType unitType) const
 {
     switch (unitType) {
