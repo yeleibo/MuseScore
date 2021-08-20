@@ -60,12 +60,25 @@ struct ExportNote
     std::vector<ExportDot> dots;
     float startTime;
     float endTime;
+    double startX;
+    double startY;
+    double width;
+    double height;
+
     std::string toJson() {
         
         QString result = QObject::tr(
             "{\"systemIndex\":%1,\"measureList1\":%2,\"staffEntries\":%3,\"measureList2\":%4,\"key\":%5,\"graphicalVoiceEntries\":%6,\"notes\":%7,\"startTime\":%8,\"endTime\":%9,\"svgId\":\"%10\"}"
          ).arg(QString::number(systemIndex), QString::number(measureIndex), QString::number(segmentIndex), QString::number(staffIndex), QString::number(noteValue), QString::number(trackIndex), QString::number(noteIndex), QString::number(int(startTime*1000)), QString::number(int(endTime*1000)), QString::fromStdString(svgId));
         
+        return result.toStdString();
+    }
+    std::string toJson2() {
+
+        QString result = QObject::tr(
+            "{\"systemIndex\":%1,\"measureIndex\":%2,\"segmentIndex\":%3,\"staffIndex\":%4,\"noteValue\":%5,\"trackIndex\":%6,\"noteIndex\":%7,\"startTime\":%8,\"endTime\":%9,\"svgId\":\"%10\",\"startX\":%11,\"startY\":%12,\"width\":%13,\"height\":%14}"
+        ).arg(QString::number(systemIndex), QString::number(measureIndex), QString::number(segmentIndex), QString::number(staffIndex), QString::number(noteValue), QString::number(trackIndex), QString::number(noteIndex), QString::number(int(startTime * 1000)), QString::number(int(endTime * 1000)), QString::fromStdString(svgId), QString::number(startX), QString::number(startY), QString::number(width), QString::number(height));
+
         return result.toStdString();
     }
 };
@@ -102,6 +115,27 @@ struct ExportMeasure
     
         return result.toStdString();
     }
+
+};
+
+struct ExportSegment
+{
+    double beatNum;
+    double startX;
+    double startY;
+    double width;
+    double height;
+
+
+    std::string toJson() {
+
+        QString result = QObject::tr(
+            "{\"startX\":%1,\"startY\":%2,\"width\":%3,\"height\":%4,\"beatNum\":%5}"
+        ).arg(QString::number(startX), QString::number(startY), QString::number(width), QString::number(height), QString::number(beatNum));
+
+        return result.toStdString();
+    }
+
 };
 
 struct ExportSheetMusicJson
@@ -109,11 +143,29 @@ struct ExportSheetMusicJson
     std::vector<ExportNote> notes;
     std::vector<ExportSystem> systems;
     std::vector<ExportMeasure> measures;
+    std::vector<ExportSegment> segments;
     Ms::TimeSigFrac timeSig;
     qreal tempo;
     std::string toJson() {
         std::string str = "{";
      
+
+        str += "\"notes\":[";
+        for (std::vector<ExportNote>::iterator note = notes.begin(); note != notes.end(); note++) {
+            str += (*note).toJson();
+            if (note != notes.end()-1) {
+                str += ",";
+            }
+            
+            
+        }
+
+        str += "]}";
+        return str;
+    }
+    std::string toJson2() {
+        std::string str = "{";
+
         str += "\"systems\":[";
         for (std::vector<ExportSystem>::iterator system = systems.begin(); system != systems.end(); system++) {
             str += (*system).toJson();
@@ -134,12 +186,12 @@ struct ExportSheetMusicJson
 
         str += "\"notes\":[";
         for (std::vector<ExportNote>::iterator note = notes.begin(); note != notes.end(); note++) {
-            str += (*note).toJson();
-            if (note != notes.end()-1) {
+            str += (*note).toJson2();
+            if (note != notes.end() - 1) {
                 str += ",";
             }
-            
-            
+
+
         }
 
         str += "]}";
@@ -151,6 +203,7 @@ ExportNote getNoteSvgInfoByParent(Ms::Rest* myRest) {
     exportNote.noteValue = 0;
     exportNote.staffIndex = myRest->staffIdx();
     exportNote.durationType = myRest->actualDurationType();
+
    QString name= exportNote.durationType.name();
     Ms::Element* parent = myRest->parent();
     Ms::Segment* segment;
@@ -281,7 +334,7 @@ ExportNote getNoteSvgInfoByParent(Ms::Note* myNote) {
 
             Ms::System* system = static_cast<Ms::System*>(parent);
             QList<Ms::System*> systems= page->systems();
-            exportNote.systemIndex=  systems.indexOf(system);
+            exportNote.systemIndex=  systems.indexOf(system)-1;
         }
 
 
@@ -528,6 +581,17 @@ mu::Ret SvgWriter::write(INotationPtr notation, Device& destinationDevice, const
             attrabute["id"] = svgId;
               
             noteInfo.svgId = svgId.toStdString();
+
+            printer.setElement(note);
+            PointF elementPosition(note->pagePos());
+            painter.translate(elementPosition);
+            mu::draw::Painter::State  state = painter.state();
+            noteInfo.startX = state.transform.m31();
+            noteInfo.startY = state.transform.m32();
+            noteInfo.width = note->width();
+            noteInfo.height = note->height();
+            painter.translate(-elementPosition);
+
             exportSheetMusicJson.notes.push_back(noteInfo);
             
             ////添加符点音符信息
@@ -547,7 +611,7 @@ mu::Ret SvgWriter::write(INotationPtr notation, Device& destinationDevice, const
         else if (element->type() == Ms::ElementType::REST) {
             Ms::Rest* rest = static_cast<Ms::Rest*>(element);
             ExportNote noteInfo = getNoteSvgInfoByParent(rest);
-            rest->globalTicks();
+ 
             //休止符
             printf("休止符");
         }
@@ -586,7 +650,6 @@ mu::Ret SvgWriter::write(INotationPtr notation, Device& destinationDevice, const
             continue ;
         }
         ExportSystem exportSystem = ExportSystem();
-       
         exportSystem.systemIndex = i-1;
         //获取system位置信息
         printer.setElement(system);
@@ -604,7 +667,7 @@ mu::Ret SvgWriter::write(INotationPtr notation, Device& destinationDevice, const
         std::vector<Ms::MeasureBase*> measures=system->measures();
         for (int j = 0; j < measures.size(); j++) {
             //获取measure位置信息
-            Ms::MeasureBase* measure = measures[j];
+            Ms::Measure* measure = static_cast<Ms::Measure*>(measures[j]);
             ExportMeasure exportMeasure = ExportMeasure();
             exportMeasure.measureIndex = measure->no();
             printer.setElement(measure);
@@ -617,7 +680,32 @@ mu::Ret SvgWriter::write(INotationPtr notation, Device& destinationDevice, const
             exportMeasure.height = measure->height();
             exportSheetMusicJson.measures.push_back(exportMeasure);
             painter.translate(-elementPosition);
-       
+            
+            Ms::SegmentList segments = measure->segments();
+            Ms::Segment* segment = segments.first();
+            int segmentIndex = -1;
+            for (int j = 0; j < segments.size(); j++) {
+                ///只导出音符的segment
+                if (segment->segmentType() == Ms::SegmentType::ChordRest) {
+                   ExportSegment exportSegment = ExportSegment();
+                    Fraction beat = segment->beat();
+                    exportSegment.beatNum=double(beat.numerator())/beat.denominator();
+                    printer.setElement(segment);
+                    PointF elementPosition(segment->pagePos());
+                    painter.translate(elementPosition);
+                    mu::draw::Painter::State  state = painter.state();
+                    exportSegment.startX = state.transform.m31();
+                    exportSegment.startY = state.transform.m32();
+                    exportSegment.width = segment->width();
+                    exportSegment.height = segment->height();
+                 
+                    exportSheetMusicJson.segments.push_back(exportSegment);
+                    painter.translate(-elementPosition);
+                }
+             
+                segment = segment->next();
+            }
+        
         }
     }  
  
@@ -634,7 +722,7 @@ mu::Ret SvgWriter::write(INotationPtr notation, Device& destinationDevice, const
 
 
    //tojson  
-    std::string str = exportSheetMusicJson.toJson();
+    std::string str = exportSheetMusicJson.toJson2();
 
     return true;
 }
