@@ -212,11 +212,51 @@ struct ExportSheetMusicJson
         return str;
     }
 };
+
+std::pair<int, float> barbeat(const Element* element) 
+{
+    if (!element) {
+        return std::pair<int, float>(0, 0.0F);
+    }
+
+    const Element* parent = element;
+    while (parent && parent->type() != ElementType::SEGMENT && parent->type() != ElementType::MEASURE) {
+        parent = parent->parent();
+    }
+
+    if (!parent) {
+        return std::pair<int, float>(0, 0.0F);
+    }
+
+    int bar = 0;
+    int beat = 0;
+    int ticks = 0;
+
+    const Ms::TimeSigMap* timeSigMap = element->score()->sigmap();
+    int ticksB = Ms::ticks_beat(timeSigMap->timesig(0).timesig().denominator());
+
+    if (parent->type() == ElementType::SEGMENT) {
+        const Ms::Segment* segment = static_cast<const Ms::Segment*>(parent);
+        timeSigMap->tickValues(segment->tick().ticks(), &bar, &beat, &ticks);
+        ticksB = Ms::ticks_beat(timeSigMap->timesig(segment->tick().ticks()).timesig().denominator());
+    }
+    else if (parent->type() == ElementType::MEASURE) {
+        const Measure* measure = static_cast<const Measure*>(parent);
+        bar = measure->no();
+        beat = -1;
+        ticks = 0;
+    }
+
+    return std::pair<int, float>(bar + 1, beat + 1 + ticks / static_cast<float>(ticksB));
+}
+
+
 ExportNote getNoteSvgInfoByParent(Ms::Rest* myRest) {
     ExportNote exportNote = ExportNote();
     exportNote.noteValue = 0;
     exportNote.staffIndex = myRest->staffIdx();
     exportNote.durationType = myRest->actualDurationType();
+    exportNote.measureIndex = barbeat(myRest).first-1;
 
    QString name= exportNote.durationType.name();
     Ms::Element* parent = myRest->parent();
@@ -247,10 +287,7 @@ ExportNote getNoteSvgInfoByParent(Ms::Rest* myRest) {
 
         }
 
-        if (parent->type() == Ms::ElementType::MEASURE) {
-            Measure* measure = static_cast<Measure*>(parent);
-            exportNote.measureIndex = measure->no();
-        }
+
 
         if (parent->type() == Ms::ElementType::SYSTEM) {
             Page* page = static_cast<Page*>(parent->parent());
@@ -289,8 +326,7 @@ ExportNote getNoteSvgInfoByParent(Ms::Note* myNote) {
     exportNote.staffIndex = myNote->staffIdx();
     exportNote.trackIndex = myNote->track();
     Ms::Element* parent=myNote->parent();
-
-
+    exportNote.measureIndex = barbeat(myNote).first-1;
     Ms::Segment* segment;
     while (parent->type() != Ms::ElementType::PAGE)
     {
@@ -345,11 +381,6 @@ ExportNote getNoteSvgInfoByParent(Ms::Note* myNote) {
 
      
 
-        }
-
-        if (parent->type() == Ms::ElementType::MEASURE) {
-            Measure* measure = static_cast<Measure*>(parent);
-            exportNote.measureIndex = measure->no();
         }
 
         if (parent->type() == Ms::ElementType::SYSTEM) {
@@ -561,14 +592,13 @@ mu::Ret SvgWriter::write(INotationPtr notation, Device& destinationDevice, const
 
         std::map<QString, QString> attrabute = std::map<QString, QString>();
         if (element->hasStaff()) {
-            const Ms::Measure* measure = element->findMeasure();
-            if (measure != NULL) {
-                int measureIndex = measure->no();
+      
+                int measureIndex = barbeat(element).first - 1;
                 int staffIndex = element->staffIdx();
                 QString staffAttabute = QString::number(measureIndex) + "-" + QString::number(staffIndex);
                 attrabute["staff"] = staffAttabute;
                 
-            }
+            
         }
         // Paint it
         if (element->type() == Ms::ElementType::NOTE) {
@@ -649,25 +679,20 @@ mu::Ret SvgWriter::write(INotationPtr notation, Device& destinationDevice, const
             printf("休止符");
         }
         else if (element->type() == Ms::ElementType::BAR_LINE) {
-            Element* parent= element->parent()->parent();
-            if (parent->type() == Ms::ElementType::MEASURE) {
-                Ms::Measure* measure = static_cast<Ms::Measure*>(parent);
-                QString svgId = "svgId" + QString::number(measure->no());
+                
+                QString svgId = "svgId" + QString::number(barbeat(element).first - 1);
                 attrabute["id"] = svgId;
-            }
+            
 
         }
         else if (element->type() == Ms::ElementType::BEAM) {
-            Ms::Beam* beam = static_cast<Ms::Beam*>(element);
-            QVector<ChordRest*> cChordRest = beam->elements();
-            
-            const Ms::Measure* measure = cChordRest.first()->findMeasure();
-            if (measure != NULL) {
-                int measureIndex = measure->no();
+                Ms::Beam* beam = static_cast<Ms::Beam*>(element);
+                QVector<ChordRest*> cChordRest = beam->elements();
+                int measureIndex = barbeat(cChordRest.first()).first - 1;
                 int staffIndex = cChordRest.first()->staffIdx();
                 QString staffAttabute = QString::number(measureIndex) + "-" + QString::number(staffIndex);
                 attrabute["staff"] = staffAttabute;
-            }
+            
         }
         
         
@@ -762,8 +787,20 @@ mu::Ret SvgWriter::write(INotationPtr notation, Device& destinationDevice, const
 
 
    //tojson  
-    std::string str = exportSheetMusicJson.toJson2();
+    std::string jsonStr = exportSheetMusicJson.toJson();
+    QString importFilePath=   score->importedFilePath();
+    int lastDot = importFilePath.lastIndexOf(".");
+    QString jsonFilePath = importFilePath.mid(0, lastDot) + ".txt";
+    QFile jsonFile = QFile(jsonFilePath);
 
+    if (jsonFile.exists())
+    {
+        jsonFile.remove();
+    }
+    jsonFile.open(QIODevice::WriteOnly);
+    
+    jsonFile.write(jsonStr.c_str());
+    jsonFile.close();
     return true;
 }
 

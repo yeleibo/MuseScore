@@ -36,6 +36,7 @@
 
 #include "log.h"
 #include <QtWidgets/qfiledialog.h>
+#include <QPushButton>
 
 using namespace mu;
 using namespace mu::userscores;
@@ -171,7 +172,7 @@ void findFile(const QString& path, std::vector<QString>& fileNames)
         }
         else
         {
-            if (fileInfo.suffix() == "mscz" || (fileInfo.suffix() == "musicxml" && fileInfo.fileName().contains("unrolled")))//设定后缀
+            if (fileInfo.suffix() == "mscz" || fileInfo.suffix() == "mscx" || (fileInfo.suffix() == "musicxml" && fileInfo.fileName().contains("unrolled")))//设定后缀
             {
                 fileNames.emplace_back(path+"/" + list.at(i).fileName());//保存全部文件名
                 //fileNames.emplace_back(list.at(i).filePath());//保存全部文件路径+文件名
@@ -208,19 +209,23 @@ void FileScoreController::openFolder(const actions::ActionData& args)
           if (!notation) {
               return;
           }
-
           notation->setViewMode(ViewMode::SYSTEM);
+          //导出svg
           ExportType exportType = ExportType::makeWithSuffixes({ "svg" },
               qtrc("userscores", "SVG Images"),
               qtrc("userscores", "SVG Images"),
               "SvgSettingsPage.qml");
           INotationPtrList notations;
           notations.push_back(notation);
-
+          
           exportScoreScenario()->exportScoresWithPath(notations, exportType, project::INotationWriter::UnitType::PER_PAGE, svgFilePath);
+          closeOpenedProject();
 
       }
     }
+    QDialog dialog = QDialog();
+    dialog.setWindowTitle("导出完成");
+    dialog.exec();
     printf("导出完成");
     //doOpenProject(scorePath);
 }
