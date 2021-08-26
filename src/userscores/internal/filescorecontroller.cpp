@@ -37,6 +37,7 @@
 #include "log.h"
 #include <QtWidgets/qfiledialog.h>
 #include <QPushButton>
+#include <QtWidgets/qmessagebox.h>
 
 using namespace mu;
 using namespace mu::userscores;
@@ -223,10 +224,16 @@ void FileScoreController::openFolder(const actions::ActionData& args)
 
       }
     }
-    QDialog dialog = QDialog();
-    dialog.setWindowTitle("导出完成");
-    dialog.exec();
-    printf("导出完成");
+    QMessageBox* msgBox;
+    msgBox = new QMessageBox("导出完成", "导出完成", QMessageBox::Question, QMessageBox::Ok | QMessageBox::Default, NULL, 0);
+    msgBox->setWindowFlags(Qt::WindowStaysOnTopHint);
+    msgBox->show();
+
+
+    //QDialog dialog = QDialog();
+    //dialog.setWindowTitle("导出完成");
+    //dialog.exec();
+    //printf("导出完成");
     //doOpenProject(scorePath);
 }
 
