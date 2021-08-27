@@ -209,45 +209,53 @@ void FileScoreController::openFolder(const actions::ActionData& args)
 
         QStringList _fnames = _f_dlg->selectedFiles();
 
-        for (size_t f = 0; f < _fnames.size(); f++)
+        for (size_t f = 1; f < _fnames.size(); f++)
         {
             QString folderPath = _fnames[f];
 
             std::vector<QString> fileNames;
             findFile(folderPath, fileNames);
 
-            for (int i = 0; i < fileNames.size(); i++) {
-                QString filePath = fileNames[i];
+          for (int i = 0; i < fileNames.size(); i++) {
+              QString filePath = fileNames[i];
+              try {
+       
+     
 
+                  int lastDot = filePath.lastIndexOf(".");
+                  QString svgFilePath = filePath.mid(0, lastDot) + ".svg";
+                  QFile svgFile(svgFilePath);
+                  if (svgFile.exists())
+                  {
+                      svgFile.remove();
+                  }
+                  svgFile.close();
+                  //打开乐谱
+                  doOpenProject(filePath);
+                  //单竖行
+                  auto notation = currentNotation();
+                  if (!notation) {
+                      return;
+                  }
+                  notation->setViewMode(ViewMode::SYSTEM);
+                  //导出svg
+                  ExportType exportType = ExportType::makeWithSuffixes({ "svg" },
+                      qtrc("userscores", "SVG Images"),
+                      qtrc("userscores", "SVG Images"),
+                      "SvgSettingsPage.qml");
+                  INotationPtrList notations;
+                  notations.push_back(notation);
+          
+                  exportScoreScenario()->exportScoresWithPath(notations, exportType, project::INotationWriter::UnitType::PER_PAGE, svgFilePath);
+                  closeOpenedProject();
+              }
+              catch (const std::exception&) {
+                  QFile errorFile = QFile(folderPath + "/err.txt");
+                  errorFile.open(QIODevice::WriteOnly | QIODevice::Append);
+                  errorFile.write((filePath + ";").toStdString().c_str());
+              }
 
-                int lastDot = filePath.lastIndexOf(".");
-                QString svgFilePath = filePath.mid(0, lastDot) + ".svg";
-                QFile svgFile(svgFilePath);
-                if (svgFile.exists())
-                {
-                    svgFile.remove();
                 }
-                svgFile.close();
-                //打开乐谱
-                doOpenProject(filePath);
-                //单竖行
-                auto notation = currentNotation();
-                if (!notation) {
-                    return;
-                }
-                notation->setViewMode(ViewMode::SYSTEM);
-                //导出svg
-                ExportType exportType = ExportType::makeWithSuffixes({ "svg" },
-                    qtrc("userscores", "SVG Images"),
-                    qtrc("userscores", "SVG Images"),
-                    "SvgSettingsPage.qml");
-                INotationPtrList notations;
-                notations.push_back(notation);
-
-                exportScoreScenario()->exportScoresWithPath(notations, exportType, project::INotationWriter::UnitType::PER_PAGE, svgFilePath);
-                closeOpenedProject();
-
-            }
         }
         
     }
@@ -263,7 +271,6 @@ void FileScoreController::openFolder(const actions::ActionData& args)
     //printf("导出完成");
     //doOpenProject(scorePath);
 }
-
 
 
 void FileScoreController::newProject()
