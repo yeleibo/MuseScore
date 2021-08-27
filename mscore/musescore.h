@@ -800,6 +800,7 @@ class MuseScore : public QMainWindow, public MuseScoreCore {
       bool panDuringPlayback() const { return panAction->isChecked(); }
       void noteTooShortForTupletDialog();
       void openFiles(bool switchTab = true, bool singleFile = false);
+      void openFloder();
       void importScore(bool switchTab = true, bool singleFile = false);
                   // midi panel functions
       void midiPanelOnSwitchToFile(const QString &file);

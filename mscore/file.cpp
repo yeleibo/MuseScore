@@ -311,6 +311,113 @@ void MuseScore::openFiles(bool switchTab, bool singleFile)
       doLoadFiles(filter, switchTab, singleFile);
       }
 
+
+/********************************************************
+输入：文件路径；保存全部文件名的容器
+/********************************************************/
+void findFile(const QString& path, std::vector<QString>& fileNames)
+{
+    QDir dir(path);
+    if (!dir.exists())
+    {
+        return;
+    }
+
+    //获取filePath下所有文件夹和文件
+    dir.setFilter(QDir::Dirs | QDir::Files | QDir::NoDotAndDotDot);//文件夹|文件|不包含./和../
+
+    //排序文件夹优先
+    dir.setSorting(QDir::DirsFirst);
+
+    //获取文件夹下所有文件(文件夹+文件)
+    QFileInfoList list = dir.entryInfoList();
+
+    /**********直接获取带文件后缀的文件;如果使用,则只搜索当前文件夹下的文件*************
+    QStringList filer;
+    filer << "*.jpg" <<"*.bmp";//设定需要的文件类型(*为所有类型)
+    QFileInfoList list = dir.entryInfoList(filer);
+    //QList<QFileInfo> *list= new QList<QFileInfo>(dir.entryInfoList(filter));
+    /*******************************************************************************/
+
+    /**********************只获取文件,只搜索当前文件夹下的文件************************
+    QStringList list= dir.entryList(filer, QDir::Files | QDir::NoDotAndDotDot);
+    /*******************************************************************************/
+
+    if (list.size() == 0)
+    {
+        return;
+    }
+
+    //遍历
+    for (int i = 0; i < list.size(); i++)
+    {
+        QFileInfo fileInfo = list.at(i);
+
+        if (fileInfo.isDir())//判断是否为文件夹
+        {
+            findFile(fileInfo.filePath(), fileNames);//递归开始
+        }
+        else
+        {
+        
+            if (!fileInfo.fileName().contains("unrolled") && (fileInfo.suffix() == "mscz" || fileInfo.suffix() == "mscx" ))//设定后缀
+            {
+                for (int j = 0; j < list.size(); j++)
+                {
+                    QFileInfo fileInfo2 = list.at(j);
+                    if (fileInfo2.suffix() == "musicxml" && fileInfo2.fileName().contains("unrolled")) {
+                         fileNames.emplace_back(path + "/" + list.at(i).fileName());//保存全部文件名
+                         break;
+                    }
+                }
+            }
+        }
+    }
+}
+void MuseScore::openFloder() {
+
+  
+        QString folderPath = QFileDialog::getExistingDirectory(nullptr, "选择一个文件夹", "/");
+
+        std::vector<QString> fileNames;
+        findFile(folderPath, fileNames);
+
+        for (int i = 0; i < fileNames.size(); i++) {
+            QString filePath = fileNames[i];
+
+
+            int lastDot = filePath.lastIndexOf(".");
+            QString unrolledFilePath = filePath.mid(0, lastDot) + "_unrolled.mscz";
+            QFile  unrolledFile(unrolledFilePath);
+            if (unrolledFile.exists())
+            {
+                unrolledFile.remove();
+            }
+            unrolledFile.close();
+            //打开乐谱
+            try
+            {
+                     MasterScore* score= static_cast<MasterScore*>(openScore(filePath, true));
+                    MasterScore* unrollScore = score->unrollRepeats();
+                    setCurrentScoreView(appendScore(unrollScore));
+                    mscore->saveAs(unrollScore, true, unrolledFilePath, "mscz");
+                    closeScore(unrollScore);
+                    closeScore(score);
+            }
+            catch (const std::exception&)
+            {
+                printf("文件又问题");
+            }
+         
+           // closeOpenedProject();
+
+        }
+    
+    QMessageBox* msgBox;
+    msgBox = new QMessageBox("导出完成", "导出完成", QMessageBox::Question, QMessageBox::Ok | QMessageBox::Default, NULL, 0);
+    msgBox->setWindowFlags(Qt::WindowStaysOnTopHint);
+    msgBox->show();
+}
 //---------------------------------------------------------
 //   importFiles
 //---------------------------------------------------------

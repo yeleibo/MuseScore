@@ -273,6 +273,7 @@ const std::list<const char*> MuseScore::_allNoteInputMenuEntries {
 const std::list<const char*> MuseScore::_allFileOperationEntries {
             "file-new",
             "file-open",
+            "folder-open",
             "file-save",
             "file-save-online",
             "print",
@@ -1356,7 +1357,7 @@ MuseScore::MuseScore()
       menuFile->addAction(a);
       menuFile->addAction(getAction("file-new"));
       menuFile->addAction(getAction("file-open"));
-
+      menuFile->addAction(getAction("folder-open"));
       openRecent = menuFile->addMenu("");
 
       connect(openRecent, SIGNAL(aboutToShow()), SLOT(openRecentMenu()));
@@ -3305,8 +3306,7 @@ void MuseScore::removeTab(int i)
 
       QString tmpName = score->tmpName();
 
-      if (!scriptTestMode && !converterMode && checkDirty(score))
-            return;
+    
       if (seq && seq->score() == score) {
             seq->stopWait();
             seq->setScoreView(0);
@@ -6262,6 +6262,8 @@ void MuseScore::cmd(QAction* a, const QString& cmd)
             newFile();
       else if (cmd == "file-open")
             openFiles();
+      else if (cmd == "folder-open")
+            openFloder();
       else if (cmd == "file-close")
             closeScore(cs);
       else if (cmd == "file-save")

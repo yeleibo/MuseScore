@@ -48,6 +48,15 @@ Shortcut Shortcut::_sc[] = {
          QT_TRANSLATE_NOOP("action","Load score from file"),
          Icons::fileOpen_ICON
          },
+         {
+         MsWidget::MAIN_WINDOW,
+         STATE_DISABLED | STATE_NORMAL | STATE_NOTE_ENTRY | STATE_EDIT | STATE_PLAY,
+         "folder-open",
+         QT_TRANSLATE_NOOP("action","folder-open"),
+         QT_TRANSLATE_NOOP("action","File > folder"),
+         QT_TRANSLATE_NOOP("action","Load score from file"),
+         Icons::fileOpen_ICON
+         },
       {
          MsWidget::MAIN_WINDOW,
          STATE_NORMAL | STATE_NOTE_ENTRY | STATE_EDIT | STATE_TEXT_EDIT| STATE_LYRICS_EDIT
