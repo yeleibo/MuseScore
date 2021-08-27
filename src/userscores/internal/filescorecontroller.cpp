@@ -27,6 +27,7 @@
 #include <cstring>        // for strcpy(), strcat()
 #include <io.h>
 #include <QDir>
+#include <QTreeView>
 #include "translation.h"
 #include "notation/notationerrors.h"
 #include "exporttype.h"
@@ -38,6 +39,8 @@
 #include <QtWidgets/qfiledialog.h>
 #include <QPushButton>
 #include <QtWidgets/qmessagebox.h>
+#include <QtWidgets/qlistwidget.h>
+#include <QtWidgets/qheaderview.h>
 
 using namespace mu;
 using namespace mu::userscores;
@@ -173,7 +176,7 @@ void findFile(const QString& path, std::vector<QString>& fileNames)
         }
         else
         {
-            if (fileInfo.suffix() == "mscz" || fileInfo.suffix() == "mscx" || (fileInfo.suffix() == "musicxml" && fileInfo.fileName().contains("unrolled")))//设定后缀
+            if (fileInfo.suffix() == "mscz")//设定后缀
             {
                 fileNames.emplace_back(path+"/" + list.at(i).fileName());//保存全部文件名
                 //fileNames.emplace_back(list.at(i).filePath());//保存全部文件路径+文件名
@@ -186,43 +189,67 @@ void FileScoreController::openFolder(const actions::ActionData& args)
     io::path scorePath = args.count() > 0 ? args.arg<io::path>(0) : "";
 
     if (scorePath.empty()) {
-        QString folderPath = QFileDialog::getExistingDirectory(nullptr, "选择一个文件夹", "/");
 
-      std::vector<QString> fileNames;
-      findFile(folderPath, fileNames);
+        QFileDialog* _f_dlg = new QFileDialog(nullptr);
+        _f_dlg->setFileMode(QFileDialog::Directory);
+        _f_dlg->setOption(QFileDialog::DontUseNativeDialog, true);
 
-      for (int i = 0; i < fileNames.size(); i++) {
-          QString filePath = fileNames[i];
-     
+        QListView* l = _f_dlg->findChild<QListView*>("listView");
+        if (l) {
+            l->setSelectionMode(QAbstractItemView::MultiSelection);
+        }
+        QTreeView* t = _f_dlg->findChild<QTreeView*>();
 
-          int lastDot = filePath.lastIndexOf(".");
-          QString svgFilePath = filePath.mid(0, lastDot) + ".svg";
-          QFile svgFile(svgFilePath);
-          if (svgFile.exists())
-          {
-              svgFile.remove();
-          }
-          svgFile.close();
-          //打开乐谱
-          doOpenProject(filePath);
-          //单竖行
-          auto notation = currentNotation();
-          if (!notation) {
-              return;
-          }
-          notation->setViewMode(ViewMode::SYSTEM);
-          //导出svg
-          ExportType exportType = ExportType::makeWithSuffixes({ "svg" },
-              qtrc("userscores", "SVG Images"),
-              qtrc("userscores", "SVG Images"),
-              "SvgSettingsPage.qml");
-          INotationPtrList notations;
-          notations.push_back(notation);
-          
-          exportScoreScenario()->exportScoresWithPath(notations, exportType, project::INotationWriter::UnitType::PER_PAGE, svgFilePath);
-          closeOpenedProject();
+        if (t) {
+            t->setSelectionMode(QAbstractItemView::MultiSelection);
+        }
+        _f_dlg->setFilter(QDir::Dirs);
 
-      }
+        int nMode = _f_dlg->exec();
+
+        QStringList _fnames = _f_dlg->selectedFiles();
+
+        for (size_t f = 0; f < _fnames.size(); f++)
+        {
+            QString folderPath = _fnames[f];
+
+            std::vector<QString> fileNames;
+            findFile(folderPath, fileNames);
+
+            for (int i = 0; i < fileNames.size(); i++) {
+                QString filePath = fileNames[i];
+
+
+                int lastDot = filePath.lastIndexOf(".");
+                QString svgFilePath = filePath.mid(0, lastDot) + ".svg";
+                QFile svgFile(svgFilePath);
+                if (svgFile.exists())
+                {
+                    svgFile.remove();
+                }
+                svgFile.close();
+                //打开乐谱
+                doOpenProject(filePath);
+                //单竖行
+                auto notation = currentNotation();
+                if (!notation) {
+                    return;
+                }
+                notation->setViewMode(ViewMode::SYSTEM);
+                //导出svg
+                ExportType exportType = ExportType::makeWithSuffixes({ "svg" },
+                    qtrc("userscores", "SVG Images"),
+                    qtrc("userscores", "SVG Images"),
+                    "SvgSettingsPage.qml");
+                INotationPtrList notations;
+                notations.push_back(notation);
+
+                exportScoreScenario()->exportScoresWithPath(notations, exportType, project::INotationWriter::UnitType::PER_PAGE, svgFilePath);
+                closeOpenedProject();
+
+            }
+        }
+        
     }
     QMessageBox* msgBox;
     msgBox = new QMessageBox("导出完成", "导出完成", QMessageBox::Question, QMessageBox::Ok | QMessageBox::Default, NULL, 0);
