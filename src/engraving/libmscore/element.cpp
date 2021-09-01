@@ -266,6 +266,7 @@ Element::~Element()
 #ifdef USE_SCORE_ACCESSIBLE_TREE
     delete m_accessible;
 #endif
+    _attrabute.clear();
     Score::onElementDestruction(this);
 }
 
