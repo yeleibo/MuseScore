@@ -176,7 +176,7 @@ void findFile(const QString& path, std::vector<QString>& fileNames)
         }
         else
         {
-            if (fileInfo.suffix() == "mscz")//设定后缀
+            if ( fileInfo.suffix() == "mscx" || fileInfo.suffix() == "mscz")//设定后缀
             {
                 fileNames.emplace_back(path+"/" + list.at(i).fileName());//保存全部文件名
                 //fileNames.emplace_back(list.at(i).filePath());//保存全部文件路径+文件名
