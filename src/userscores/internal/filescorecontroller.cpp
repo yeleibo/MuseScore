@@ -248,13 +248,15 @@ void FileScoreController::openFolder(const actions::ActionData& args)
           
                   exportScoreScenario()->exportScoresWithPath(notations, exportType, project::INotationWriter::UnitType::PER_PAGE, svgFilePath);
                   closeOpenedProject();
+        
               }
               catch (const std::exception&) {
                   QFile errorFile = QFile(folderPath + "/err.txt");
                   errorFile.open(QIODevice::WriteOnly | QIODevice::Append);
                   errorFile.write((filePath + ";").toStdString().c_str());
               }
-
+              ///清除最近连续记录避免磁盘和内存占用过大
+              clearRecentScores();
                 }
         }
         

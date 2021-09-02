@@ -698,7 +698,7 @@ mu::Ret SvgWriter::write(INotationPtr notation, Device& destinationDevice, const
         
         element->setAttrabute(attrabute);
         Ms::paintElement(painter, element);
-      
+        attrabute.clear();
     }
     std::stable_sort(notes.begin(), notes.end(), Ms::elementLessThan);
     QList<Ms::System*> systems= page->systems();
