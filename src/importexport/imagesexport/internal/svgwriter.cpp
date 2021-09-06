@@ -321,12 +321,15 @@ ExportNote getNoteSvgInfoByParent(Ms::Rest* myRest) {
 /// <param name="myNote"></param>
 /// <returns></returns>
 ExportNote getNoteSvgInfoByParent(Ms::Note* myNote) {
+    //升八度或者降八度
+    int uprodown = myNote->ottaveCapoFret();
     ExportNote exportNote = ExportNote();
-    exportNote.noteValue = myNote->pitch();
+    exportNote.noteValue = myNote->pitch()+ uprodown;
     exportNote.staffIndex = myNote->staffIdx();
     exportNote.trackIndex = myNote->track();
     Ms::Element* parent=myNote->parent();
     exportNote.measureIndex = barbeat(myNote).first-1;
+
     Ms::Segment* segment;
     while (parent->type() != Ms::ElementType::PAGE)
     {
