@@ -365,7 +365,7 @@ void findFile(const QString& path, std::vector<QString>& fileNames)
                 for (int j = 0; j < list.size(); j++)
                 {
                     QFileInfo fileInfo2 = list.at(j);
-                    if (fileInfo2.suffix() == "musicxml" && fileInfo2.fileName().contains("unrolled")) {
+                    if ((fileInfo2.suffix() == "musicxml" || fileInfo2.suffix() == "xml") && fileInfo2.fileName().contains("unrolled")) {
                          fileNames.emplace_back(path + "/" + list.at(i).fileName());//保存全部文件名
                          break;
                     }
