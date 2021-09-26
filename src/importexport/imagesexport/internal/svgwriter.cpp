@@ -433,6 +433,7 @@ mu::Ret SvgWriter::write(INotationPtr notation, Device& destinationDevice, const
     score->renderMidi(&events, false, false, score->synthesizerState());
     //节拍相关
     Ms::TempoMap*  tempo=masterScore->tempomap();
+
     std::map<int, Ms::TEvent>::iterator tEvent = tempo->begin();
     exportSheetMusicJson.tempo=(*tEvent).second.tempo;
 
@@ -624,8 +625,11 @@ mu::Ret SvgWriter::write(INotationPtr notation, Device& destinationDevice, const
             bool isStartHaveValue = false;
             for (auto i = events.begin(); i != events.end(); ++i) {
                   const Ms::NPlayEvent& event = i->second;
+                  const Ms::NoteEvent event1 = note->playEvents()[0];
+                  
                 if (event.note() == note) {
-                    float time = float(i->first) / Ms::MScore::division;
+                    float time = tempo->tick2time(i->first);  
+                    //float(i->first) / Ms::MScore::division;
              
                     if (!isStartHaveValue) {
                         noteInfo.startTime = time;
