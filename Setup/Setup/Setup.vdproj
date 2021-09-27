@@ -2037,6 +2037,12 @@
         }
         "Entry"
         {
+        "MsmKey" = "8:_39154AF609EF4D29A2DA9E10546512A6"
+        "OwnerKey" = "8:_UNDEFINED"
+        "MsmSig" = "8:_UNDEFINED"
+        }
+        "Entry"
+        {
         "MsmKey" = "8:_394920CE089643F2A01BDA49A807638B"
         "OwnerKey" = "8:_UNDEFINED"
         "MsmSig" = "8:_UNDEFINED"
@@ -9261,7 +9267,7 @@
         "DisplayName" = "8:Debug"
         "IsDebugOnly" = "11:TRUE"
         "IsReleaseOnly" = "11:FALSE"
-        "OutputFilename" = "8:Debug\\Setup.msi"
+        "OutputFilename" = "8:Debug\\MuseScore4.msi"
         "PackageFilesAs" = "3:2"
         "PackageFileSize" = "3:-2147483648"
         "CabType" = "3:1"
@@ -9271,6 +9277,14 @@
         "PrivateKeyFile" = "8:"
         "TimeStampServer" = "8:"
         "InstallerBootstrapper" = "3:2"
+            "BootstrapperCfg:{63ACBE69-63AA-4F98-B2B6-99F9E24495F2}"
+            {
+            "Enabled" = "11:TRUE"
+            "PromptEnabled" = "11:TRUE"
+            "PrerequisitesLocation" = "2:1"
+            "Url" = "8:"
+            "ComponentsUrl" = "8:"
+            }
         }
         "Release"
         {
@@ -9287,6 +9301,14 @@
         "PrivateKeyFile" = "8:"
         "TimeStampServer" = "8:"
         "InstallerBootstrapper" = "3:2"
+            "BootstrapperCfg:{63ACBE69-63AA-4F98-B2B6-99F9E24495F2}"
+            {
+            "Enabled" = "11:TRUE"
+            "PromptEnabled" = "11:TRUE"
+            "PrerequisitesLocation" = "2:1"
+            "Url" = "8:"
+            "ComponentsUrl" = "8:"
+            }
         }
     }
     "Deployable"
@@ -16034,6 +16056,26 @@
             "TargetName" = "8:ButtonStyle.qml"
             "Tag" = "8:"
             "Folder" = "8:_4A2D46849A654BA194C11E72A990C209"
+            "Condition" = "8:"
+            "Transitive" = "11:FALSE"
+            "Vital" = "11:TRUE"
+            "ReadOnly" = "11:FALSE"
+            "Hidden" = "11:FALSE"
+            "System" = "11:FALSE"
+            "Permanent" = "11:FALSE"
+            "SharedLegacy" = "11:FALSE"
+            "PackageAs" = "3:1"
+            "Register" = "3:1"
+            "Exclude" = "11:FALSE"
+            "IsDependency" = "11:FALSE"
+            "IsolateTo" = "8:"
+            }
+            "{1FB2D0AE-D3B9-43D4-B9DD-F88EC61E35DE}:_39154AF609EF4D29A2DA9E10546512A6"
+            {
+            "SourcePath" = "8:..\\..\\favicon.ico"
+            "TargetName" = "8:favicon.ico"
+            "Tag" = "8:"
+            "Folder" = "8:_42B3070682F84F429192FAD10D1BF08A"
             "Condition" = "8:"
             "Transitive" = "11:FALSE"
             "Vital" = "11:TRUE"
@@ -41549,7 +41591,7 @@
         "Product"
         {
         "Name" = "8:Microsoft Visual Studio"
-        "ProductName" = "8:Setup"
+        "ProductName" = "8:MuseScore4"
         "ProductCode" = "8:{897AC5C3-96F3-4B2C-9371-22A6F5AE8AB4}"
         "PackageCode" = "8:{8663E279-F85A-4900-A0F7-7DF520058DAB}"
         "UpgradeCode" = "8:{9399C217-F158-4AFE-A07E-622AB1D6309C}"
@@ -41562,7 +41604,7 @@
         "Manufacturer" = "8:Default Company Name"
         "ARPHELPTELEPHONE" = "8:"
         "ARPHELPLINK" = "8:"
-        "Title" = "8:Setup"
+        "Title" = "8:MuseScore4"
         "Subject" = "8:"
         "ARPCONTACT" = "8:Default Company Name"
         "Keywords" = "8:"
@@ -41673,7 +41715,7 @@
         {
             "{970C0BB2-C7D0-45D7-ABFA-7EC378858BC0}:_76114135E2634E33917C0DF7026E33E7"
             {
-            "Name" = "8:Shortcut to MuseScore4.exe"
+            "Name" = "8:MuseScore4.exe"
             "Arguments" = "8:"
             "Description" = "8:"
             "ShowCmd" = "3:1"
@@ -41682,7 +41724,7 @@
             "Target" = "8:_EE8611CC79C64A2EA721A304BB7F3E87"
             "Folder" = "8:_9DF4198FCE154C3B842B1CB087A462E0"
             "WorkingFolder" = "8:_8AA8B5C20351478D8878308504DA6EE9"
-            "Icon" = "8:"
+            "Icon" = "8:_39154AF609EF4D29A2DA9E10546512A6"
             "Feature" = "8:"
             }
         }
